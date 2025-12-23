@@ -398,6 +398,18 @@ pub unsafe extern "system" fn mini_overlay_proc(
                             database::save_session_active_time(active);
                         }
 
+                        // Check for warning 1 (e.g., 10 minutes remaining)
+                        let (warn1_mins, warn1_msg) = database::get_warning_config(1);
+                        if new_time == (warn1_mins * 60) as i32 {
+                            crate::overlay::show_overlay(&warn1_msg, 10);
+                        }
+
+                        // Check for warning 2 (e.g., 5 minutes remaining)
+                        let (warn2_mins, warn2_msg) = database::get_warning_config(2);
+                        if new_time == (warn2_mins * 60) as i32 {
+                            crate::overlay::show_overlay(&warn2_msg, 10);
+                        }
+
                         // Trigger blocking overlay when time reaches 0
                         if new_time == 0 {
                             let msg = database::get_blocking_message();
