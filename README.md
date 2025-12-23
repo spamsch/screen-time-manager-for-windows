@@ -163,6 +163,61 @@ The application uses a named mutex to ensure only one instance runs:
 Global\ScreenTimeManager_SingleInstance_7F3A9B2E
 ```
 
+### Multi-Monitor Support
+
+When the blocking overlay is triggered, all connected monitors are blanked:
+- The primary monitor displays the full blocking UI with passcode entry
+- Secondary monitors display a simple "Screen Locked" message
+- All overlays are shown/hidden together
+
+### Autostart Configuration
+
+To have Screen Time Manager start automatically when Windows boots, you can use one of the following methods:
+
+#### Method 1: Startup Folder (Recommended for single user)
+
+1. Press `Win + R` to open the Run dialog
+2. Type `shell:startup` and press Enter
+3. Copy `screen-time-manager.exe` to this folder, or create a shortcut:
+   - Right-click in the folder and select **New > Shortcut**
+   - Browse to the location of `screen-time-manager.exe`
+   - Click **Next** and give it a name like "Screen Time Manager"
+
+#### Method 2: Registry (All users)
+
+Run this command in an elevated Command Prompt or PowerShell:
+
+```cmd
+reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" /v "ScreenTimeManager" /t REG_SZ /d "C:\Path\To\screen-time-manager.exe" /f
+```
+
+Replace `C:\Path\To\screen-time-manager.exe` with the actual path to the executable.
+
+To remove:
+```cmd
+reg delete "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" /v "ScreenTimeManager" /f
+```
+
+#### Method 3: Task Scheduler (Most control)
+
+1. Open **Task Scheduler** (search for it in the Start menu)
+2. Click **Create Task** (not "Create Basic Task")
+3. **General tab**:
+   - Name: "Screen Time Manager"
+   - Select "Run whether user is logged on or not"
+   - Check "Run with highest privileges"
+4. **Triggers tab**:
+   - Click **New**
+   - Begin the task: "At log on"
+   - Select "Any user" or a specific user
+5. **Actions tab**:
+   - Click **New**
+   - Action: "Start a program"
+   - Browse to `screen-time-manager.exe`
+6. **Conditions tab**:
+   - Uncheck "Start the task only if the computer is on AC power"
+7. Click **OK** and enter admin credentials if prompted
+
 ### Building from Source
 
 #### Prerequisites
@@ -202,12 +257,63 @@ The release binary will be at `target/release/screen-time-manager.exe`.
 - Cannot prevent a user with administrator privileges from terminating the process
 - Time tracking is based on system clock (changing system time could affect tracking)
 
-### Future Improvements
+### Future Improvements / TODO
 
-Potential enhancements that could be added:
-- Historical usage statistics and reporting (weekly/monthly trends)
-- Multiple user profiles
-- Remote management via web interface
-- Application-specific time limits
-- Break reminders (e.g., "Take a 5-minute break every hour")
-- Schedule-based automatic enabling/disabling
+This section lists known limitations and potential enhancements for future development.
+
+#### Security Hardening (High Priority)
+
+- [ ] **Database encryption** - Encrypt the SQLite database or at least the passcode field to prevent tampering
+- [ ] **Passcode hashing** - Store passcode as a salted hash instead of plain text
+- [ ] **Database file protection** - Set restrictive ACLs on the database file to prevent non-admin users from modifying it
+- [ ] **Anti-tampering detection** - Detect if the database has been modified externally and take action (e.g., lock the screen)
+- [ ] **Process protection** - Prevent the process from being killed via Task Manager by non-admin users (requires running as SYSTEM or using a kernel driver)
+- [ ] **Prevent system time manipulation** - Detect and handle attempts to change the system clock to bypass time limits
+
+#### Installation & Deployment
+
+- [ ] **Windows Service mode** - Run as a Windows Service instead of a user-space application for better protection and earlier startup
+- [ ] **MSI/MSIX installer** - Create a proper installer with:
+  - Automatic service registration
+  - Autostart configuration
+  - Uninstaller
+  - Upgrade support
+- [ ] **Group Policy support** - Allow deployment and configuration via Active Directory Group Policy
+
+#### Features
+
+- [ ] **Historical usage statistics** - Track and display weekly/monthly usage trends with graphs
+- [ ] **Multiple user profiles** - Support different limits for different Windows user accounts
+- [ ] **Remote management** - Web interface or mobile app for parents to monitor and adjust settings remotely
+- [ ] **Application-specific limits** - Set time limits for specific applications (e.g., games) separately from total screen time
+- [ ] **Break reminders** - Configurable reminders to take breaks (e.g., "Take a 5-minute break every hour")
+- [ ] **Schedule-based limits** - Allow different limits based on time of day (e.g., no screen time after 9 PM)
+- [ ] **Reward system** - Allow parents to grant bonus time for completing tasks/chores
+- [ ] **Grace period** - Configurable grace period after time expires to save work
+- [ ] **Activity logging** - Log when the computer was used, when blocks occurred, when extensions were granted
+- [ ] **Export/Import settings** - Backup and restore configuration
+
+#### User Interface
+
+- [ ] **Modern UI** - Consider using a UI framework (WinUI 3, egui) for a more modern appearance
+- [ ] **Localization** - Support multiple languages
+- [ ] **Custom themes** - Allow customization of overlay colors and fonts
+- [ ] **Accessibility** - Ensure screen reader compatibility and keyboard navigation
+- [ ] **High DPI support** - Proper scaling on high-resolution displays
+
+#### Technical Improvements
+
+- [ ] **Logging** - Add configurable logging for debugging and auditing
+- [ ] **Error handling** - More robust error handling with user-friendly error messages
+- [ ] **Configuration file** - Support an alternative configuration file in addition to the database
+- [ ] **Portable mode** - Option to store data next to the executable instead of in AppData
+- [ ] **Update mechanism** - Automatic update checking and installation
+- [ ] **Crash recovery** - Automatically restart if the application crashes
+- [ ] **Memory optimization** - Profile and optimize memory usage for long-running sessions
+
+#### Testing
+
+- [ ] **Unit tests** - Add comprehensive unit tests for core logic
+- [ ] **Integration tests** - Test database operations and window management
+- [ ] **Fuzzing** - Fuzz test the passcode entry and settings dialogs
+- [ ] **CI/CD pipeline** - Automated building and testing on commits

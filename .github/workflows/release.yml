@@ -1,0 +1,152 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - release
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Windows Release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Build release binary
+        run: cargo build --release
+
+      - name: Get version from Cargo.toml
+        id: version
+        shell: pwsh
+        run: |
+          $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"' | ForEach-Object { $_.Matches.Groups[1].Value })
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+          echo "Version: $version"
+
+      - name: Get short commit hash
+        id: commit
+        shell: pwsh
+        run: |
+          $hash = git rev-parse --short HEAD
+          echo "HASH=$hash" >> $env:GITHUB_OUTPUT
+          echo "Commit: $hash"
+
+      - name: Create release archive
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.VERSION }}"
+          $archiveName = "screen-time-manager-v$version-windows-x64.zip"
+          Compress-Archive -Path "target/release/screen-time-manager.exe" -DestinationPath $archiveName
+          echo "ARCHIVE_NAME=$archiveName" >> $env:GITHUB_ENV
+
+      - name: Generate release notes
+        id: notes
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.VERSION }}"
+          $hash = "${{ steps.commit.outputs.HASH }}"
+          $date = Get-Date -Format "yyyy-MM-dd"
+
+          $notes = @"
+          ## Screen Time Manager v$version
+
+          **Release Date:** $date
+          **Commit:** $hash
+
+          ### Installation
+
+          1. Download ``screen-time-manager-v$version-windows-x64.zip``
+          2. Extract the executable to a folder of your choice
+          3. Run ``screen-time-manager.exe``
+
+          ### Autostart (Optional)
+
+          To start automatically with Windows:
+          1. Press ``Win + R``, type ``shell:startup``, press Enter
+          2. Create a shortcut to ``screen-time-manager.exe`` in this folder
+
+          ### Requirements
+
+          - Windows 10 or later (64-bit)
+          - No additional dependencies required
+          "@
+
+          # Write to file for the release action
+          $notes | Out-File -FilePath "RELEASE_NOTES.md" -Encoding utf8
+
+      - name: Check if release exists
+        id: check_release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = "${{ steps.version.outputs.VERSION }}"
+          $tagName = "v$version"
+
+          $releases = gh release list --json tagName | ConvertFrom-Json
+          $exists = $releases | Where-Object { $_.tagName -eq $tagName }
+
+          if ($exists) {
+            echo "EXISTS=true" >> $env:GITHUB_OUTPUT
+            echo "Release $tagName already exists"
+          } else {
+            echo "EXISTS=false" >> $env:GITHUB_OUTPUT
+            echo "Release $tagName does not exist"
+          }
+
+      - name: Create GitHub Release
+        if: steps.check_release.outputs.EXISTS == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.VERSION }}"
+          $tagName = "v$version"
+          $archiveName = $env:ARCHIVE_NAME
+
+          gh release create $tagName `
+            --title "Screen Time Manager v$version" `
+            --notes-file "RELEASE_NOTES.md" `
+            $archiveName
+
+      - name: Update existing release
+        if: steps.check_release.outputs.EXISTS == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.VERSION }}"
+          $tagName = "v$version"
+          $archiveName = $env:ARCHIVE_NAME
+
+          # Delete old asset if exists
+          $assets = gh release view $tagName --json assets | ConvertFrom-Json
+          foreach ($asset in $assets.assets) {
+            if ($asset.name -eq $archiveName) {
+              gh release delete-asset $tagName $asset.name --yes
+            }
+          }
+
+          # Upload new asset
+          gh release upload $tagName $archiveName --clobber
