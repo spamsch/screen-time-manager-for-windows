@@ -1,0 +1,39 @@
+[package]
+name = "screen-time-manager"
+version = "0.1.0"
+edition = "2021"
+description = "A screen time management application that runs in the system tray"
+authors = ["Shadow"]
+
+[dependencies]
+# Windows API bindings
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Shell",
+    "Win32_System_LibraryLoader",
+    "Win32_System_SystemInformation",
+    "Win32_Graphics_Gdi",
+    "Win32_UI_Controls",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_Media_Audio",
+    "Win32_System_Threading",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+] }
+
+# SQLite database
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+# For finding app data directories
+dirs = "5.0"
+
+[build-dependencies]
+embed-resource = "2.4"
+
+[profile.release]
+opt-level = "z"     # Optimize for size
+lto = true          # Link-time optimization
+codegen-units = 1   # Single codegen unit for better optimization
+panic = "abort"     # Abort on panic (smaller binary)
+strip = true        # Strip symbols

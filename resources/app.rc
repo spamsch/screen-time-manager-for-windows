@@ -1,0 +1,7 @@
+// Windows resource file for Screen Time Manager
+
+// Application icon (ID 1 is the default application icon)
+1 ICON "app.ico"
+
+// Application manifest for modern Windows styling and DPI awareness
+1 24 "app.manifest"
