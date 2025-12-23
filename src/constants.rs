@@ -11,6 +11,7 @@ pub const IDM_SHOW_OVERLAY: u16 = 1003;
 pub const IDM_SHOW_BLOCKING: u16 = 1004;
 pub const IDM_SETTINGS: u16 = 1005;
 pub const IDM_TODAYS_STATS: u16 = 1006;
+pub const IDM_PAUSE_TOGGLE: u16 = 1007;
 
 // Mutex name for single instance
 pub const MUTEX_NAME: &str = "Global\\ScreenTimeManager_SingleInstance_7F3A9B2E";

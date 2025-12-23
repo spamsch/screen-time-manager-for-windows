@@ -19,8 +19,9 @@ use windows::{
 
 use crate::blocking::{hide_blocking_overlay, show_blocking_overlay, BLOCKING_HWND};
 use crate::constants::*;
-use crate::database::{get_blocking_message, get_warning_config};
+use crate::database::{get_blocking_message, get_warning_config, is_pause_enabled};
 use crate::dialogs::{show_settings_dialog, show_stats_dialog, verify_passcode_for_quit};
+use crate::mini_overlay::{is_paused, can_pause, toggle_pause, PauseBlockedReason, get_remaining_pause_budget};
 use crate::overlay::{show_overlay, OVERLAY_HWND};
 use std::sync::atomic::Ordering;
 
@@ -70,21 +71,84 @@ pub unsafe fn remove_tray_icon() {
 pub unsafe fn show_context_menu(hwnd: HWND) {
     let hmenu = CreatePopupMenu().expect("Failed to create popup menu");
 
+    // Determine pause menu item text and state
+    let paused = is_paused();
+    let pause_enabled = is_pause_enabled();
+
+    let (pause_text, pause_flags) = if paused {
+        // Currently paused - show resume option (always available)
+        ("Resume Timer", MF_BYPOSITION | MF_STRING)
+    } else if !pause_enabled {
+        // Pause feature disabled
+        ("Pause (Disabled)", MF_BYPOSITION | MF_STRING | MF_GRAYED)
+    } else {
+        // Check if pause is available
+        match can_pause() {
+            Ok(()) => {
+                let budget_mins = get_remaining_pause_budget() / 60;
+                let text = format!("Pause Timer ({}m left)", budget_mins);
+                // Need to leak the string for the menu (will be cleaned up with menu)
+                let wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+                let ptr = wide.as_ptr();
+                std::mem::forget(wide);
+                return show_context_menu_with_pause(hwnd, hmenu, PCWSTR(ptr), MF_BYPOSITION | MF_STRING);
+            }
+            Err(PauseBlockedReason::BudgetExhausted) => {
+                ("Pause (Budget used)", MF_BYPOSITION | MF_STRING | MF_GRAYED)
+            }
+            Err(PauseBlockedReason::CooldownActive { seconds_remaining }) => {
+                let mins = (seconds_remaining + 59) / 60; // Round up
+                let text = format!("Pause ({}m cooldown)", mins);
+                let wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+                let ptr = wide.as_ptr();
+                std::mem::forget(wide);
+                return show_context_menu_with_pause(hwnd, hmenu, PCWSTR(ptr), MF_BYPOSITION | MF_STRING | MF_GRAYED);
+            }
+            Err(PauseBlockedReason::MinActiveTimeNotMet { seconds_remaining }) => {
+                let mins = (seconds_remaining + 59) / 60;
+                let text = format!("Pause (wait {}m)", mins);
+                let wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+                let ptr = wide.as_ptr();
+                std::mem::forget(wide);
+                return show_context_menu_with_pause(hwnd, hmenu, PCWSTR(ptr), MF_BYPOSITION | MF_STRING | MF_GRAYED);
+            }
+            Err(PauseBlockedReason::TimeTooLow) => {
+                ("Pause (Time too low)", MF_BYPOSITION | MF_STRING | MF_GRAYED)
+            }
+            Err(PauseBlockedReason::Disabled) => {
+                ("Pause (Disabled)", MF_BYPOSITION | MF_STRING | MF_GRAYED)
+            }
+        }
+    };
+
+    let pause_wide: Vec<u16> = pause_text.encode_utf16().chain(std::iter::once(0)).collect();
+    show_context_menu_with_pause(hwnd, hmenu, PCWSTR(pause_wide.as_ptr()), pause_flags);
+}
+
+/// Helper to show context menu with pause item
+unsafe fn show_context_menu_with_pause(hwnd: HWND, hmenu: HMENU, pause_text: PCWSTR, pause_flags: MENU_ITEM_FLAGS) {
     InsertMenuW(hmenu, 0, MF_BYPOSITION | MF_STRING, IDM_TODAYS_STATS as usize, w!("Today's Stats..."))
         .expect("Failed to insert menu item");
     InsertMenuW(hmenu, 1, MF_BYPOSITION | MF_STRING, IDM_SETTINGS as usize, w!("Settings..."))
         .expect("Failed to insert menu item");
     InsertMenuW(hmenu, 2, MF_BYPOSITION | MF_SEPARATOR, 0, PCWSTR::null())
         .expect("Failed to insert separator");
-    InsertMenuW(hmenu, 3, MF_BYPOSITION | MF_STRING, IDM_SHOW_OVERLAY as usize, w!("Show Warning (5s)"))
-        .expect("Failed to insert menu item");
-    InsertMenuW(hmenu, 4, MF_BYPOSITION | MF_STRING, IDM_SHOW_BLOCKING as usize, w!("Show Blocking Overlay"))
-        .expect("Failed to insert menu item");
-    InsertMenuW(hmenu, 5, MF_BYPOSITION | MF_SEPARATOR, 0, PCWSTR::null())
+
+    // Pause menu item with dynamic text
+    InsertMenuW(hmenu, 3, pause_flags, IDM_PAUSE_TOGGLE as usize, pause_text)
+        .expect("Failed to insert pause menu item");
+
+    InsertMenuW(hmenu, 4, MF_BYPOSITION | MF_SEPARATOR, 0, PCWSTR::null())
         .expect("Failed to insert separator");
-    InsertMenuW(hmenu, 6, MF_BYPOSITION | MF_STRING, IDM_ABOUT as usize, w!("About"))
+    InsertMenuW(hmenu, 5, MF_BYPOSITION | MF_STRING, IDM_SHOW_OVERLAY as usize, w!("Show Warning (5s)"))
         .expect("Failed to insert menu item");
-    InsertMenuW(hmenu, 7, MF_BYPOSITION | MF_STRING, IDM_QUIT as usize, w!("Quit"))
+    InsertMenuW(hmenu, 6, MF_BYPOSITION | MF_STRING, IDM_SHOW_BLOCKING as usize, w!("Show Blocking Overlay"))
+        .expect("Failed to insert menu item");
+    InsertMenuW(hmenu, 7, MF_BYPOSITION | MF_SEPARATOR, 0, PCWSTR::null())
+        .expect("Failed to insert separator");
+    InsertMenuW(hmenu, 8, MF_BYPOSITION | MF_STRING, IDM_ABOUT as usize, w!("About"))
+        .expect("Failed to insert menu item");
+    InsertMenuW(hmenu, 9, MF_BYPOSITION | MF_STRING, IDM_QUIT as usize, w!("Quit"))
         .expect("Failed to insert menu item");
 
     let mut point = zeroed();
@@ -126,6 +190,18 @@ pub unsafe extern "system" fn window_proc(
         WM_COMMAND => {
             let menu_id = (wparam.0 & 0xFFFF) as u16;
             match menu_id {
+                IDM_PAUSE_TOGGLE => {
+                    // Toggle pause state (no passcode required - it's a child feature)
+                    match toggle_pause() {
+                        Ok(_is_now_paused) => {
+                            // Success - UI will update automatically
+                        }
+                        Err(_reason) => {
+                            // Should not happen since menu item should be grayed out
+                            // But just in case, do nothing
+                        }
+                    }
+                }
                 IDM_SHOW_OVERLAY => {
                     let (minutes, message) = get_warning_config(1);
                     show_overlay(&message, minutes);

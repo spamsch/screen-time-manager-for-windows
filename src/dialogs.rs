@@ -21,7 +21,7 @@ use windows::{
 };
 
 use crate::constants::*;
-use crate::database::{get_passcode, get_setting, set_setting, WEEKDAY_KEYS, WEEKDAY_NAMES};
+use crate::database::{get_passcode, get_setting, set_setting, WEEKDAY_KEYS, WEEKDAY_NAMES, get_pause_used_today, get_pause_config, get_pause_log_today, is_pause_enabled};
 
 // Control IDs for settings dialog
 const ID_SETTINGS_BASE: i32 = 2000;
@@ -803,7 +803,7 @@ pub unsafe fn show_stats_dialog(parent_hwnd: HWND) {
                 let reset_btn = CreateWindowExW(
                     WINDOW_EX_STYLE(0), w!("BUTTON"), w!("Reset Timer"),
                     WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_PUSHBUTTON as u32),
-                    50, 200, 120, 35, hwnd, HMENU(ID_RESET_TIMER as _), hinstance, None,
+                    50, 310, 120, 35, hwnd, HMENU(ID_RESET_TIMER as _), hinstance, None,
                 );
                 if let Ok(h) = reset_btn { SendMessageW(h, WM_SETFONT, WPARAM(btn_font.0 as usize), LPARAM(1)); }
 
@@ -811,7 +811,7 @@ pub unsafe fn show_stats_dialog(parent_hwnd: HWND) {
                 let close_btn = CreateWindowExW(
                     WINDOW_EX_STYLE(0), w!("BUTTON"), w!("Close"),
                     WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_PUSHBUTTON as u32),
-                    190, 200, 100, 35, hwnd, HMENU(ID_CLOSE as _), hinstance, None,
+                    190, 310, 100, 35, hwnd, HMENU(ID_CLOSE as _), hinstance, None,
                 );
                 if let Ok(h) = close_btn { SendMessageW(h, WM_SETFONT, WPARAM(btn_font.0 as usize), LPARAM(1)); }
 
@@ -839,6 +839,14 @@ pub unsafe fn show_stats_dialog(parent_hwnd: HWND) {
                     0
                 };
 
+                // Get pause stats
+                let pause_enabled = is_pause_enabled();
+                let pause_config = get_pause_config();
+                let pause_used_seconds = get_pause_used_today();
+                let pause_budget_seconds = (pause_config.daily_budget_minutes * 60) as i32;
+                let pause_remaining_seconds = (pause_budget_seconds - pause_used_seconds).max(0);
+                let pause_log = get_pause_log_today();
+
                 // Format time helper
                 fn format_duration(seconds: i32) -> String {
                     if seconds < 0 {
@@ -864,11 +872,17 @@ pub unsafe fn show_stats_dialog(parent_hwnd: HWND) {
                 let title_font = CreateFontW(
                     22, 0, 0, 0, FW_BOLD.0 as i32, 0, 0, 0, 0, 0, 0, 0, 0, w!("Segoe UI"),
                 );
+                let section_font = CreateFontW(
+                    16, 0, 0, 0, FW_BOLD.0 as i32, 0, 0, 0, 0, 0, 0, 0, 0, w!("Segoe UI"),
+                );
                 let label_font = CreateFontW(
-                    16, 0, 0, 0, FW_NORMAL.0 as i32, 0, 0, 0, 0, 0, 0, 0, 0, w!("Segoe UI"),
+                    15, 0, 0, 0, FW_NORMAL.0 as i32, 0, 0, 0, 0, 0, 0, 0, 0, w!("Segoe UI"),
                 );
                 let value_font = CreateFontW(
-                    18, 0, 0, 0, FW_BOLD.0 as i32, 0, 0, 0, 0, 0, 0, 0, 0, w!("Segoe UI"),
+                    16, 0, 0, 0, FW_BOLD.0 as i32, 0, 0, 0, 0, 0, 0, 0, 0, w!("Segoe UI"),
+                );
+                let small_font = CreateFontW(
+                    13, 0, 0, 0, FW_NORMAL.0 as i32, 0, 0, 0, 0, 0, 0, 0, 0, w!("Segoe UI"),
                 );
 
                 let old_font = SelectObject(hdc, title_font);
@@ -876,7 +890,7 @@ pub unsafe fn show_stats_dialog(parent_hwnd: HWND) {
                 SetBkMode(hdc, TRANSPARENT);
 
                 // Title
-                let mut title_rect = RECT { left: 0, top: 20, right: rect.right, bottom: 50 };
+                let mut title_rect = RECT { left: 0, top: 15, right: rect.right, bottom: 42 };
                 DrawTextW(
                     hdc,
                     &mut "Today's Statistics".encode_utf16().collect::<Vec<_>>(),
@@ -885,53 +899,53 @@ pub unsafe fn show_stats_dialog(parent_hwnd: HWND) {
                 );
 
                 // Stats
-                let mut y = 65;
-                let left_margin = 30;
-                let value_x = 180;
+                let mut y = 50;
+                let left_margin = 25;
+                let value_x = 160;
 
                 // Day
                 SelectObject(hdc, label_font);
                 SetTextColor(hdc, COLORREF(0x00666666));
-                let mut label_rect = RECT { left: left_margin, top: y, right: value_x, bottom: y + 25 };
+                let mut label_rect = RECT { left: left_margin, top: y, right: value_x, bottom: y + 22 };
                 DrawTextW(hdc, &mut "Day:".encode_utf16().collect::<Vec<_>>(), &mut label_rect, DT_SINGLELINE);
 
                 SelectObject(hdc, value_font);
                 SetTextColor(hdc, COLORREF(0x00333333));
                 let day_str = format!("{}", weekday_name);
-                let mut value_rect = RECT { left: value_x, top: y, right: rect.right - 20, bottom: y + 25 };
+                let mut value_rect = RECT { left: value_x, top: y, right: rect.right - 15, bottom: y + 22 };
                 DrawTextW(hdc, &mut day_str.encode_utf16().collect::<Vec<_>>(), &mut value_rect, DT_SINGLELINE);
-                y += 30;
+                y += 24;
 
                 // Daily limit
                 SelectObject(hdc, label_font);
                 SetTextColor(hdc, COLORREF(0x00666666));
-                let mut label_rect = RECT { left: left_margin, top: y, right: value_x, bottom: y + 25 };
+                let mut label_rect = RECT { left: left_margin, top: y, right: value_x, bottom: y + 22 };
                 DrawTextW(hdc, &mut "Daily Limit:".encode_utf16().collect::<Vec<_>>(), &mut label_rect, DT_SINGLELINE);
 
                 SelectObject(hdc, value_font);
                 SetTextColor(hdc, COLORREF(0x00333333));
-                let limit_str = format!("{} min ({})", daily_limit_minutes, format_duration(daily_limit_seconds));
-                let mut value_rect = RECT { left: value_x, top: y, right: rect.right - 20, bottom: y + 25 };
+                let limit_str = format!("{} min", daily_limit_minutes);
+                let mut value_rect = RECT { left: value_x, top: y, right: rect.right - 15, bottom: y + 22 };
                 DrawTextW(hdc, &mut limit_str.encode_utf16().collect::<Vec<_>>(), &mut value_rect, DT_SINGLELINE);
-                y += 30;
+                y += 24;
 
                 // Time used
                 SelectObject(hdc, label_font);
                 SetTextColor(hdc, COLORREF(0x00666666));
-                let mut label_rect = RECT { left: left_margin, top: y, right: value_x, bottom: y + 25 };
+                let mut label_rect = RECT { left: left_margin, top: y, right: value_x, bottom: y + 22 };
                 DrawTextW(hdc, &mut "Time Used:".encode_utf16().collect::<Vec<_>>(), &mut label_rect, DT_SINGLELINE);
 
                 SelectObject(hdc, value_font);
                 SetTextColor(hdc, COLORREF(0x00333333));
                 let used_str = format_duration(used_seconds.max(0));
-                let mut value_rect = RECT { left: value_x, top: y, right: rect.right - 20, bottom: y + 25 };
+                let mut value_rect = RECT { left: value_x, top: y, right: rect.right - 15, bottom: y + 22 };
                 DrawTextW(hdc, &mut used_str.encode_utf16().collect::<Vec<_>>(), &mut value_rect, DT_SINGLELINE);
-                y += 30;
+                y += 24;
 
                 // Time remaining
                 SelectObject(hdc, label_font);
                 SetTextColor(hdc, COLORREF(0x00666666));
-                let mut label_rect = RECT { left: left_margin, top: y, right: value_x, bottom: y + 25 };
+                let mut label_rect = RECT { left: left_margin, top: y, right: value_x, bottom: y + 22 };
                 DrawTextW(hdc, &mut "Time Remaining:".encode_utf16().collect::<Vec<_>>(), &mut label_rect, DT_SINGLELINE);
 
                 SelectObject(hdc, value_font);
@@ -944,13 +958,84 @@ pub unsafe fn show_stats_dialog(parent_hwnd: HWND) {
                     SetTextColor(hdc, COLORREF(0x00008800)); // Green
                 }
                 let remaining_str = format_duration(remaining_seconds);
-                let mut value_rect = RECT { left: value_x, top: y, right: rect.right - 20, bottom: y + 25 };
+                let mut value_rect = RECT { left: value_x, top: y, right: rect.right - 15, bottom: y + 22 };
                 DrawTextW(hdc, &mut remaining_str.encode_utf16().collect::<Vec<_>>(), &mut value_rect, DT_SINGLELINE);
+                y += 32;
+
+                // ===== Pause Section =====
+                SelectObject(hdc, section_font);
+                SetTextColor(hdc, COLORREF(0x00333333));
+                let mut section_rect = RECT { left: left_margin, top: y, right: rect.right - 15, bottom: y + 20 };
+                DrawTextW(hdc, &mut "Pause Mode".encode_utf16().collect::<Vec<_>>(), &mut section_rect, DT_SINGLELINE);
+                y += 22;
+
+                if pause_enabled {
+                    // Pause budget used
+                    SelectObject(hdc, label_font);
+                    SetTextColor(hdc, COLORREF(0x00666666));
+                    let mut label_rect = RECT { left: left_margin, top: y, right: value_x, bottom: y + 22 };
+                    DrawTextW(hdc, &mut "Pause Used:".encode_utf16().collect::<Vec<_>>(), &mut label_rect, DT_SINGLELINE);
+
+                    SelectObject(hdc, value_font);
+                    SetTextColor(hdc, COLORREF(0x00333333));
+                    let pause_used_str = format!("{} / {} min", pause_used_seconds / 60, pause_config.daily_budget_minutes);
+                    let mut value_rect = RECT { left: value_x, top: y, right: rect.right - 15, bottom: y + 22 };
+                    DrawTextW(hdc, &mut pause_used_str.encode_utf16().collect::<Vec<_>>(), &mut value_rect, DT_SINGLELINE);
+                    y += 24;
+
+                    // Pause remaining
+                    SelectObject(hdc, label_font);
+                    SetTextColor(hdc, COLORREF(0x00666666));
+                    let mut label_rect = RECT { left: left_margin, top: y, right: value_x, bottom: y + 22 };
+                    DrawTextW(hdc, &mut "Pause Remaining:".encode_utf16().collect::<Vec<_>>(), &mut label_rect, DT_SINGLELINE);
+
+                    SelectObject(hdc, value_font);
+                    if pause_remaining_seconds <= 0 {
+                        SetTextColor(hdc, COLORREF(COLOR_ERROR));
+                    } else if pause_remaining_seconds <= 300 {
+                        SetTextColor(hdc, COLORREF(COLOR_ACCENT));
+                    } else {
+                        SetTextColor(hdc, COLORREF(0x00008800)); // Green
+                    }
+                    let pause_remaining_str = format_duration(pause_remaining_seconds);
+                    let mut value_rect = RECT { left: value_x, top: y, right: rect.right - 15, bottom: y + 22 };
+                    DrawTextW(hdc, &mut pause_remaining_str.encode_utf16().collect::<Vec<_>>(), &mut value_rect, DT_SINGLELINE);
+                    y += 24;
+
+                    // Pause count
+                    SelectObject(hdc, label_font);
+                    SetTextColor(hdc, COLORREF(0x00666666));
+                    let mut label_rect = RECT { left: left_margin, top: y, right: value_x, bottom: y + 22 };
+                    DrawTextW(hdc, &mut "Pauses Today:".encode_utf16().collect::<Vec<_>>(), &mut label_rect, DT_SINGLELINE);
+
+                    SelectObject(hdc, value_font);
+                    SetTextColor(hdc, COLORREF(0x00333333));
+                    let pause_count_str = format!("{}", pause_log.len());
+                    let mut value_rect = RECT { left: value_x, top: y, right: rect.right - 15, bottom: y + 22 };
+                    DrawTextW(hdc, &mut pause_count_str.encode_utf16().collect::<Vec<_>>(), &mut value_rect, DT_SINGLELINE);
+                    y += 24;
+
+                    // Pause log (if any)
+                    if !pause_log.is_empty() {
+                        SelectObject(hdc, small_font);
+                        SetTextColor(hdc, COLORREF(0x00888888));
+                        let log_str = format!("Log: {}", pause_log.join(", "));
+                        let mut log_rect = RECT { left: left_margin, top: y, right: rect.right - 15, bottom: y + 18 };
+                        DrawTextW(hdc, &mut log_str.encode_utf16().collect::<Vec<_>>(), &mut log_rect, DT_SINGLELINE);
+                    }
+                } else {
+                    SelectObject(hdc, label_font);
+                    SetTextColor(hdc, COLORREF(0x00888888));
+                    let mut disabled_rect = RECT { left: left_margin, top: y, right: rect.right - 15, bottom: y + 22 };
+                    DrawTextW(hdc, &mut "Pause feature is disabled".encode_utf16().collect::<Vec<_>>(), &mut disabled_rect, DT_SINGLELINE);
+                }
 
                 SelectObject(hdc, old_font);
                 let _ = DeleteObject(title_font);
+                let _ = DeleteObject(section_font);
                 let _ = DeleteObject(label_font);
                 let _ = DeleteObject(value_font);
+                let _ = DeleteObject(small_font);
 
                 let _ = EndPaint(hwnd, &ps);
                 LRESULT(0)
@@ -1003,7 +1088,7 @@ pub unsafe fn show_stats_dialog(parent_hwnd: HWND) {
     let screen_width = GetSystemMetrics(SM_CXSCREEN);
     let screen_height = GetSystemMetrics(SM_CYSCREEN);
     let dialog_width = 340;
-    let dialog_height = 280;
+    let dialog_height = 390;
 
     let dialog_hwnd = CreateWindowExW(
         WS_EX_TOPMOST | WS_EX_DLGMODALFRAME,

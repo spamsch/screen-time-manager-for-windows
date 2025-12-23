@@ -2,7 +2,7 @@
 //! Small, always-visible display showing remaining time
 
 use std::mem::zeroed;
-use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicI64, AtomicPtr, Ordering};
 use windows::{
     core::w,
     Win32::{
@@ -18,10 +18,17 @@ use windows::{
 
 use crate::blocking::REMAINING_SECONDS;
 use crate::constants::*;
+use crate::database;
 
 /// Global state for mini overlay window
 pub static MINI_OVERLAY_HWND: AtomicPtr<std::ffi::c_void> = AtomicPtr::new(std::ptr::null_mut());
 pub static MINI_OVERLAY_VISIBLE: AtomicBool = AtomicBool::new(false);
+
+// Pause state tracking
+pub static IS_PAUSED: AtomicBool = AtomicBool::new(false);
+pub static PAUSE_START_TIMESTAMP: AtomicI64 = AtomicI64::new(0);
+pub static CURRENT_PAUSE_DURATION: AtomicI32 = AtomicI32::new(0);
+pub static SESSION_ACTIVE_SECONDS: AtomicI32 = AtomicI32::new(0);
 
 /// Timer ID for updating the mini overlay
 pub const TIMER_MINI_UPDATE: usize = 10;
@@ -138,6 +145,159 @@ fn get_time_color(seconds: i32) -> u32 {
     }
 }
 
+// ============================================================================
+// Pause Mode Functions
+// ============================================================================
+
+/// Check if timer is currently paused
+pub fn is_paused() -> bool {
+    IS_PAUSED.load(Ordering::SeqCst)
+}
+
+/// Reason why pause is not available
+#[derive(Debug, Clone)]
+pub enum PauseBlockedReason {
+    Disabled,
+    BudgetExhausted,
+    CooldownActive { seconds_remaining: i32 },
+    MinActiveTimeNotMet { seconds_remaining: i32 },
+    TimeTooLow,
+}
+
+/// Check if pause is currently available and return reason if not
+pub fn can_pause() -> Result<(), PauseBlockedReason> {
+    // Already paused - can always unpause
+    if IS_PAUSED.load(Ordering::SeqCst) {
+        return Ok(());
+    }
+
+    // Check if pause feature is enabled
+    if !database::is_pause_enabled() {
+        return Err(PauseBlockedReason::Disabled);
+    }
+
+    let config = database::get_pause_config();
+
+    // Check if remaining time is too low (< 1 minute)
+    let remaining = REMAINING_SECONDS.load(Ordering::SeqCst);
+    if remaining < 60 {
+        return Err(PauseBlockedReason::TimeTooLow);
+    }
+
+    // Check daily budget
+    let pause_used = database::get_pause_used_today();
+    let budget_seconds = (config.daily_budget_minutes * 60) as i32;
+    if pause_used >= budget_seconds {
+        return Err(PauseBlockedReason::BudgetExhausted);
+    }
+
+    // Check cooldown
+    let last_pause_end = database::get_last_pause_end();
+    let current_time = database::get_current_timestamp();
+    let cooldown_seconds = (config.cooldown_minutes * 60) as i64;
+    let time_since_last_pause = current_time - last_pause_end;
+
+    if last_pause_end > 0 && time_since_last_pause < cooldown_seconds {
+        let remaining_cooldown = (cooldown_seconds - time_since_last_pause) as i32;
+        return Err(PauseBlockedReason::CooldownActive {
+            seconds_remaining: remaining_cooldown,
+        });
+    }
+
+    // Check minimum active time
+    let session_active = SESSION_ACTIVE_SECONDS.load(Ordering::SeqCst);
+    let min_active_seconds = (config.min_active_time_minutes * 60) as i32;
+
+    if session_active < min_active_seconds {
+        let remaining_active = min_active_seconds - session_active;
+        return Err(PauseBlockedReason::MinActiveTimeNotMet {
+            seconds_remaining: remaining_active,
+        });
+    }
+
+    Ok(())
+}
+
+/// Get remaining pause budget in seconds
+pub fn get_remaining_pause_budget() -> i32 {
+    let config = database::get_pause_config();
+    let budget_seconds = (config.daily_budget_minutes * 60) as i32;
+    let used = database::get_pause_used_today();
+    (budget_seconds - used).max(0)
+}
+
+/// Get maximum pause duration for current pause (considering budget and config)
+pub fn get_max_pause_duration() -> i32 {
+    let config = database::get_pause_config();
+    let max_single = (config.max_duration_minutes * 60) as i32;
+    let remaining_budget = get_remaining_pause_budget();
+    max_single.min(remaining_budget)
+}
+
+/// Toggle pause state - returns true if now paused, false if resumed
+pub fn toggle_pause() -> Result<bool, PauseBlockedReason> {
+    if IS_PAUSED.load(Ordering::SeqCst) {
+        // Currently paused - resume
+        resume_timer();
+        Ok(false)
+    } else {
+        // Not paused - try to pause
+        can_pause()?;
+        pause_timer();
+        Ok(true)
+    }
+}
+
+/// Pause the timer
+fn pause_timer() {
+    let timestamp = database::get_current_timestamp();
+    PAUSE_START_TIMESTAMP.store(timestamp, Ordering::SeqCst);
+    CURRENT_PAUSE_DURATION.store(0, Ordering::SeqCst);
+    IS_PAUSED.store(true, Ordering::SeqCst);
+
+    // Update display immediately
+    unsafe {
+        let hwnd = HWND(MINI_OVERLAY_HWND.load(Ordering::SeqCst));
+        if !hwnd.0.is_null() {
+            let _ = InvalidateRect(hwnd, None, true);
+        }
+    }
+}
+
+/// Resume the timer (end pause)
+fn resume_timer() {
+    let pause_duration = CURRENT_PAUSE_DURATION.load(Ordering::SeqCst);
+
+    // Update total pause used today
+    let total_used = database::get_pause_used_today() + pause_duration;
+    database::save_pause_used_today(total_used);
+
+    // Log the pause event
+    database::log_pause_event(pause_duration);
+
+    // Save last pause end timestamp
+    let timestamp = database::get_current_timestamp();
+    database::save_last_pause_end(timestamp);
+
+    // Reset pause state
+    IS_PAUSED.store(false, Ordering::SeqCst);
+    PAUSE_START_TIMESTAMP.store(0, Ordering::SeqCst);
+    CURRENT_PAUSE_DURATION.store(0, Ordering::SeqCst);
+
+    // Update display immediately
+    unsafe {
+        let hwnd = HWND(MINI_OVERLAY_HWND.load(Ordering::SeqCst));
+        if !hwnd.0.is_null() {
+            let _ = InvalidateRect(hwnd, None, true);
+        }
+    }
+}
+
+/// Force resume (called when max duration reached)
+fn force_resume() {
+    resume_timer();
+}
+
 /// Window procedure for the mini overlay
 pub unsafe extern "system" fn mini_overlay_proc(
     hwnd: HWND,
@@ -153,15 +313,32 @@ pub unsafe extern "system" fn mini_overlay_proc(
             let mut rect: RECT = zeroed();
             GetClientRect(hwnd, &mut rect).ok();
 
-            // Dark background with rounded feel
-            let bg_brush = CreateSolidBrush(COLORREF(0x00222222));
+            let paused = IS_PAUSED.load(Ordering::SeqCst);
+
+            // Background color changes when paused
+            let bg_color = if paused { 0x00332200 } else { 0x00222222 }; // Brownish when paused
+            let bg_brush = CreateSolidBrush(COLORREF(bg_color));
             FillRect(hdc, &rect, bg_brush);
             let _ = DeleteObject(bg_brush);
 
-            // Get remaining time
+            // Get remaining time and pause info
             let remaining = REMAINING_SECONDS.load(Ordering::SeqCst);
-            let time_str = format_time_compact(remaining);
-            let color = get_time_color(remaining);
+
+            let (display_text, color) = if paused {
+                // Show pause indicator and remaining pause time
+                let pause_duration = CURRENT_PAUSE_DURATION.load(Ordering::SeqCst);
+                let max_duration = get_max_pause_duration();
+                let pause_remaining = max_duration - pause_duration;
+
+                // Format: "⏸ 0:45" (pause symbol + remaining pause time)
+                let pause_time_str = format_time_compact(pause_remaining);
+                (format!("II {}", pause_time_str), 0x0066CCFF_u32) // Cyan/light blue for paused
+            } else {
+                // Normal display
+                let time_str = format_time_compact(remaining);
+                let color = get_time_color(remaining);
+                (time_str, color)
+            };
 
             // Draw time
             let hfont = CreateFontW(
@@ -175,7 +352,6 @@ pub unsafe extern "system" fn mini_overlay_proc(
             SetTextColor(hdc, COLORREF(color));
             SetBkMode(hdc, TRANSPARENT);
 
-            let display_text = format!("{}", time_str);
             let wide_text: Vec<u16> = display_text.encode_utf16().collect();
             DrawTextW(
                 hdc,
@@ -192,20 +368,41 @@ pub unsafe extern "system" fn mini_overlay_proc(
         }
         WM_TIMER => {
             if wparam.0 == TIMER_MINI_UPDATE {
-                let current = REMAINING_SECONDS.load(Ordering::SeqCst);
-                if current > 0 {
-                    let new_time = current - 1;
-                    REMAINING_SECONDS.store(new_time, Ordering::SeqCst);
+                let paused = IS_PAUSED.load(Ordering::SeqCst);
 
-                    // Save to database periodically (every 30 seconds)
-                    if new_time % 30 == 0 {
-                        crate::database::save_remaining_time(new_time);
+                if paused {
+                    // Timer is paused - increment pause duration instead
+                    let duration = CURRENT_PAUSE_DURATION.fetch_add(1, Ordering::SeqCst) + 1;
+                    let max_duration = get_max_pause_duration();
+
+                    // Check if max pause duration reached
+                    if duration >= max_duration {
+                        // Auto-resume
+                        force_resume();
                     }
+                } else {
+                    // Timer is running normally
+                    let current = REMAINING_SECONDS.load(Ordering::SeqCst);
+                    if current > 0 {
+                        let new_time = current - 1;
+                        REMAINING_SECONDS.store(new_time, Ordering::SeqCst);
 
-                    // Trigger blocking overlay when time reaches 0
-                    if new_time == 0 {
-                        let msg = crate::database::get_blocking_message();
-                        crate::blocking::show_blocking_overlay(&msg);
+                        // Increment session active time
+                        SESSION_ACTIVE_SECONDS.fetch_add(1, Ordering::SeqCst);
+
+                        // Save to database periodically (every 30 seconds)
+                        if new_time % 30 == 0 {
+                            database::save_remaining_time(new_time);
+                            // Also save session active time
+                            let active = SESSION_ACTIVE_SECONDS.load(Ordering::SeqCst);
+                            database::save_session_active_time(active);
+                        }
+
+                        // Trigger blocking overlay when time reaches 0
+                        if new_time == 0 {
+                            let msg = database::get_blocking_message();
+                            crate::blocking::show_blocking_overlay(&msg);
+                        }
                     }
                 }
                 let _ = InvalidateRect(hwnd, None, true);

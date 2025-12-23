@@ -14,10 +14,12 @@ Screen Time Manager helps you control how much time your child spends on the com
 
 - **Daily Time Limits** - Set different time limits for each day of the week (e.g., 2 hours on weekdays, 4 hours on weekends)
 - **Always-Visible Timer** - A small, unobtrusive timer display in the top-right corner shows remaining time at a glance
+- **Pause Mode** - Children can pause the timer themselves (with configurable limits) for breaks, meals, or homework
 - **Warning Notifications** - Configurable warnings before time runs out (e.g., "10 minutes remaining!" and "5 minutes remaining!")
 - **Full-Screen Block** - When time is up, a full-screen overlay blocks the computer until the passcode is entered
+- **Multi-Monitor Support** - Blocking overlay covers all connected monitors
 - **Time Extensions** - Parents can grant extra time (+15, +30, or +60 minutes) by entering the passcode
-- **Today's Stats** - View daily statistics including time used, time remaining, and reset the timer if needed
+- **Today's Stats** - View daily statistics including time used, time remaining, pause usage, and reset the timer if needed
 - **Passcode Protection** - All settings and unlocking require a 4-digit passcode (changeable in settings)
 - **Persistent Tracking** - Time tracking continues even if the computer restarts
 
@@ -69,6 +71,49 @@ The small timer overlay in the top-right corner:
   - **Red**: 1 minute or less
 - Is click-through (doesn't interfere with using the computer)
 - Automatically hides when the blocking screen appears
+- When paused, shows "II X:XX" (remaining pause time) in cyan
+
+### Pause Mode
+
+Pause mode gives children some autonomy to temporarily stop the timer without needing a parent's passcode. This is useful for meals, homework, or other activities where they need to step away.
+
+#### How Children Use Pause
+
+1. Right-click the tray icon
+2. Click "Pause Timer" (shows remaining pause budget)
+3. The timer stops and the mini overlay shows pause countdown
+4. To resume, right-click and click "Resume Timer" (or wait for auto-resume)
+
+#### Built-in Safeguards
+
+Pause mode has multiple protections to prevent abuse:
+
+| Protection | Default | Description |
+|------------|---------|-------------|
+| **Daily Budget** | 45 min | Total pause time allowed per day |
+| **Max Duration** | 20 min | Single pause auto-resumes after this |
+| **Cooldown** | 15 min | Must wait between pauses |
+| **Min Active Time** | 10 min | Must use timer before first pause |
+| **Low Time Block** | 1 min | Cannot pause with less than 1 minute remaining |
+
+#### Pause Menu States
+
+The tray menu shows why pause may be unavailable:
+- **"Pause Timer (Xm left)"** - Available, shows remaining budget
+- **"Resume Timer"** - Currently paused, click to resume
+- **"Pause (Budget used)"** - Daily pause budget exhausted
+- **"Pause (Xm cooldown)"** - Waiting for cooldown period
+- **"Pause (wait Xm)"** - Need more active time first
+- **"Pause (Time too low)"** - Less than 1 minute of screen time left
+- **"Pause (Disabled)"** - Parent has disabled pause feature
+
+#### Viewing Pause History
+
+Parents can view pause usage in "Today's Stats...":
+- Pause Used: X / 45 min
+- Pause Remaining: time left in budget
+- Pauses Today: count of pauses taken
+- Log: timestamps of each pause
 
 ### Tips for Parents
 
@@ -77,6 +122,8 @@ The small timer overlay in the top-right corner:
 - Use the warning messages to help children prepare to wrap up their activities
 - The time tracking persists across restarts, so restarting the computer won't reset the timer
 - Use "Today's Stats" to monitor usage and reset the timer when needed (e.g., for a fresh start)
+- Review pause usage in "Today's Stats" to ensure pause mode isn't being abused
+- If pause mode is being misused, you can disable it by setting `pause_enabled` to `0` in the database
 
 ---
 
@@ -134,6 +181,13 @@ CREATE TABLE settings (
 | `warning2_message` | Second warning text | "5 minutes remaining!" |
 | `blocking_message` | Message shown on block screen | "Your screen time limit has been reached." |
 | `remaining_time_YYYY-MM-DD` | Remaining seconds for date | (dynamic) |
+| `pause_enabled` | Enable/disable pause feature | `1` (enabled) |
+| `pause_daily_budget` | Total pause minutes per day | `45` |
+| `pause_max_duration` | Max minutes per single pause | `20` |
+| `pause_cooldown` | Minutes between pauses | `15` |
+| `pause_min_active_time` | Min minutes before first pause | `10` |
+| `pause_used_YYYY-MM-DD` | Pause seconds used for date | (dynamic) |
+| `pause_log_YYYY-MM-DD` | Comma-separated pause log | (dynamic) |
 
 ### Window Styles
 
