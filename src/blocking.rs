@@ -7,8 +7,13 @@ use std::sync::Mutex;
 use windows::{
     core::w,
     Win32::{
-        Foundation::{COLORREF, HWND, LPARAM, LRESULT, RECT, WPARAM},
-        Graphics::Gdi::*,
+        Foundation::{BOOL, COLORREF, HWND, LPARAM, LRESULT, RECT, WPARAM},
+        Graphics::Gdi::{
+            BeginPaint, CreateFontW, CreatePen, CreateSolidBrush, DeleteObject, DrawTextW,
+            EndPaint, EnumDisplayMonitors, FillRect, InvalidateRect, RoundRect, SelectObject,
+            SetBkMode, SetTextColor, DT_CENTER, DT_SINGLELINE, DT_VCENTER, FW_BOLD, FW_NORMAL,
+            HDC, HMONITOR, PAINTSTRUCT, PS_SOLID, TRANSPARENT,
+        },
         Media::Audio::{PlaySoundW, SND_ALIAS, SND_ASYNC},
         System::LibraryLoader::GetModuleHandleW,
         UI::{
@@ -21,6 +26,15 @@ use windows::{
 
 use crate::constants::*;
 use crate::database::get_passcode;
+
+/// Storage for secondary monitor overlay handles (stores raw pointers as isize for Send+Sync)
+static SECONDARY_OVERLAY_HWNDS: Mutex<Vec<isize>> = Mutex::new(Vec::new());
+
+/// Monitor information collected during enumeration
+struct MonitorInfo {
+    rect: RECT,
+    is_primary: bool,
+}
 
 /// Global state for blocking overlay
 pub static BLOCKING_HWND: AtomicPtr<std::ffi::c_void> = AtomicPtr::new(std::ptr::null_mut());
@@ -117,6 +131,9 @@ pub unsafe fn show_blocking_overlay_with_time(text: &str, remaining_seconds: i32
 
     // Start countdown timer (updates every second)
     let _ = SetTimer(hwnd, TIMER_COUNTDOWN, 1000, None);
+
+    // Show secondary monitor overlays (blanks other monitors)
+    show_secondary_overlays();
 }
 
 /// Extend the remaining time by the specified minutes
@@ -163,6 +180,9 @@ pub unsafe fn hide_blocking_overlay() {
     let _ = KillTimer(hwnd, TIMER_COUNTDOWN);
     let _ = ShowWindow(hwnd, SW_HIDE);
     *BLOCKING_TEXT.lock().unwrap() = None;
+
+    // Hide secondary monitor overlays
+    hide_secondary_overlays();
 
     // Save remaining time to database
     let remaining = REMAINING_SECONDS.load(Ordering::SeqCst);
@@ -644,5 +664,171 @@ pub unsafe fn register_blocking_class(hinstance: windows::Win32::Foundation::HMO
 
     if RegisterClassW(&blocking_wnd_class) == 0 {
         panic!("Failed to register blocking overlay window class");
+    }
+
+    // Register secondary overlay class (simpler, no controls)
+    let secondary_class_name = w!("ScreenTimeSecondaryBlockingClass");
+    let secondary_wnd_class = WNDCLASSW {
+        style: CS_HREDRAW | CS_VREDRAW,
+        lpfnWndProc: Some(secondary_overlay_proc),
+        hInstance: hinstance.into(),
+        lpszClassName: secondary_class_name,
+        hbrBackground: CreateSolidBrush(COLORREF(COLOR_OVERLAY_BG)),
+        hCursor: LoadCursorW(None, IDC_ARROW).ok().unwrap_or_default(),
+        ..zeroed()
+    };
+
+    if RegisterClassW(&secondary_wnd_class) == 0 {
+        panic!("Failed to register secondary blocking overlay window class");
+    }
+}
+
+/// Window procedure for secondary monitor overlays (simple blank screen)
+pub unsafe extern "system" fn secondary_overlay_proc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    match msg {
+        WM_PAINT => {
+            let mut ps: PAINTSTRUCT = zeroed();
+            let hdc = BeginPaint(hwnd, &mut ps);
+
+            let mut rect: RECT = zeroed();
+            GetClientRect(hwnd, &mut rect).ok();
+
+            // Fill with dark background
+            let bg_brush = CreateSolidBrush(COLORREF(COLOR_OVERLAY_BG));
+            FillRect(hdc, &rect, bg_brush);
+            let _ = DeleteObject(bg_brush);
+
+            // Draw "Screen Locked" text in center
+            let font = CreateFontW(
+                48, 0, 0, 0,
+                FW_BOLD.0 as i32,
+                0, 0, 0, 0, 0, 0, 0, 0,
+                w!("Segoe UI"),
+            );
+            let old_font = SelectObject(hdc, font);
+            SetTextColor(hdc, COLORREF(COLOR_TEXT_LIGHT));
+            SetBkMode(hdc, TRANSPARENT);
+
+            DrawTextW(
+                hdc,
+                &mut "Screen Locked".encode_utf16().collect::<Vec<_>>(),
+                &mut rect,
+                DT_CENTER | DT_VCENTER | DT_SINGLELINE,
+            );
+
+            SelectObject(hdc, old_font);
+            let _ = DeleteObject(font);
+
+            let _ = EndPaint(hwnd, &ps);
+            LRESULT(0)
+        }
+        WM_ERASEBKGND => LRESULT(1),
+        WM_CLOSE => LRESULT(0), // Prevent closing
+        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+    }
+}
+
+/// Callback for EnumDisplayMonitors to collect monitor information
+unsafe extern "system" fn monitor_enum_callback(
+    _hmonitor: HMONITOR,
+    _hdc: HDC,
+    lprect: *mut RECT,
+    lparam: LPARAM,
+) -> BOOL {
+    let monitors = &mut *(lparam.0 as *mut Vec<MonitorInfo>);
+
+    if let Some(rect) = lprect.as_ref() {
+        // Check if this is the primary monitor (origin at 0,0)
+        let is_primary = rect.left == 0 && rect.top == 0;
+
+        monitors.push(MonitorInfo {
+            rect: *rect,
+            is_primary,
+        });
+    }
+
+    BOOL::from(true) // Continue enumeration
+}
+
+/// Enumerate all monitors and return their information
+unsafe fn enumerate_monitors() -> Vec<MonitorInfo> {
+    let mut monitors: Vec<MonitorInfo> = Vec::new();
+
+    let _ = EnumDisplayMonitors(
+        None,
+        None,
+        Some(monitor_enum_callback),
+        LPARAM(&mut monitors as *mut Vec<MonitorInfo> as isize),
+    );
+
+    monitors
+}
+
+/// Create secondary overlay windows for all non-primary monitors
+pub unsafe fn create_secondary_overlays(hinstance: windows::Win32::Foundation::HMODULE) {
+    let monitors = enumerate_monitors();
+    let class_name = w!("ScreenTimeSecondaryBlockingClass");
+
+    let mut secondary_hwnds = SECONDARY_OVERLAY_HWNDS.lock().unwrap();
+    secondary_hwnds.clear();
+
+    for monitor in monitors {
+        // Skip the primary monitor (main blocking overlay handles it)
+        if monitor.is_primary {
+            continue;
+        }
+
+        let width = monitor.rect.right - monitor.rect.left;
+        let height = monitor.rect.bottom - monitor.rect.top;
+
+        let hwnd = CreateWindowExW(
+            WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
+            class_name,
+            w!("Screen Time - Locked"),
+            WS_POPUP,
+            monitor.rect.left,
+            monitor.rect.top,
+            width,
+            height,
+            None,
+            None,
+            hinstance,
+            None,
+        );
+
+        if let Ok(h) = hwnd {
+            secondary_hwnds.push(h.0 as isize);
+        }
+    }
+}
+
+/// Show all secondary monitor overlays
+unsafe fn show_secondary_overlays() {
+    let secondary_hwnds = SECONDARY_OVERLAY_HWNDS.lock().unwrap();
+
+    for &hwnd_ptr in secondary_hwnds.iter() {
+        let hwnd = HWND(hwnd_ptr as *mut std::ffi::c_void);
+        SetWindowPos(
+            hwnd,
+            HWND_TOPMOST,
+            0, 0, 0, 0,
+            SWP_SHOWWINDOW | SWP_NOMOVE | SWP_NOSIZE,
+        ).ok();
+        let _ = ShowWindow(hwnd, SW_SHOW);
+    }
+}
+
+/// Hide all secondary monitor overlays
+unsafe fn hide_secondary_overlays() {
+    let secondary_hwnds = SECONDARY_OVERLAY_HWNDS.lock().unwrap();
+
+    for &hwnd_ptr in secondary_hwnds.iter() {
+        let hwnd = HWND(hwnd_ptr as *mut std::ffi::c_void);
+        let _ = ShowWindow(hwnd, SW_HIDE);
     }
 }

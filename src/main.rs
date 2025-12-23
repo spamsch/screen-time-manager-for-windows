@@ -26,7 +26,7 @@ use windows::{
     },
 };
 
-use blocking::{create_blocking_overlay, register_blocking_class, REMAINING_SECONDS};
+use blocking::{create_blocking_overlay, create_secondary_overlays, register_blocking_class, REMAINING_SECONDS};
 use constants::MUTEX_NAME;
 use database::{init_database, load_remaining_time, get_current_weekday, get_daily_limit};
 use mini_overlay::{create_mini_overlay, register_mini_overlay_class, show_mini_overlay};
@@ -103,6 +103,7 @@ fn main() {
         // Create the overlay windows (initially hidden)
         create_overlay_window(hinstance);
         create_blocking_overlay(hinstance);
+        create_secondary_overlays(hinstance);  // Create overlays for secondary monitors
         create_mini_overlay(hinstance);
 
         // Initialize remaining time from database or daily limit
