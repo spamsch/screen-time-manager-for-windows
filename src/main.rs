@@ -117,6 +117,12 @@ fn main() {
         // Show the mini overlay with remaining time
         show_mini_overlay();
 
+        // If time is already exhausted, show blocking overlay immediately
+        if remaining <= 0 {
+            let msg = database::get_blocking_message();
+            blocking::show_blocking_overlay(&msg);
+        }
+
         // Add the system tray icon
         add_tray_icon(hwnd);
 
