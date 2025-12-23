@@ -1,6 +1,10 @@
 # Screen Time Manager
 
-A Windows parental control application for managing children's screen time. The application runs quietly in the system tray and enforces daily time limits with customizable warnings.
+A Windows parental control application for managing children's screen time. The application runs quietly in the system tray and enforces daily time limits with customizable warnings. This is a solution that works on any Windows PC. It does not require Family Controls or Google Family Link. It just works.
+
+I built this because I did not want to create a separate account for my kid. Also, he is sometimes on my Windows laptop and needs time control there too.
+
+This solution is not safe for tech savvy kids as they can shut down the application through the task manager. But this can be solved in a future version.
 
 ---
 
