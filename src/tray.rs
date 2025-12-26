@@ -17,7 +17,7 @@ use windows::{
     },
 };
 
-use crate::blocking::{hide_blocking_overlay, show_blocking_overlay, BLOCKING_HWND};
+use crate::blocking::{extend_time, hide_blocking_overlay, show_blocking_overlay, BLOCKING_HWND};
 use crate::constants::*;
 use crate::database::{get_blocking_message, get_warning_config, is_pause_enabled};
 use crate::dialogs::{show_settings_dialog, show_stats_dialog, verify_passcode_for_quit};
@@ -133,22 +133,28 @@ unsafe fn show_context_menu_with_pause(hwnd: HWND, hmenu: HMENU, pause_text: PCW
         .expect("Failed to insert menu item");
     InsertMenuW(hmenu, 2, MF_BYPOSITION | MF_SEPARATOR, 0, PCWSTR::null())
         .expect("Failed to insert separator");
+    InsertMenuW(hmenu, 3, MF_BYPOSITION | MF_STRING, IDM_EXTEND_15 as usize, w!("Extend +15 min"))
+        .expect("Failed to insert menu item");
+    InsertMenuW(hmenu, 4, MF_BYPOSITION | MF_STRING, IDM_EXTEND_45 as usize, w!("Extend +45 min"))
+        .expect("Failed to insert menu item");
+    InsertMenuW(hmenu, 5, MF_BYPOSITION | MF_SEPARATOR, 0, PCWSTR::null())
+        .expect("Failed to insert separator");
 
     // Pause menu item with dynamic text
-    InsertMenuW(hmenu, 3, pause_flags, IDM_PAUSE_TOGGLE as usize, pause_text)
+    InsertMenuW(hmenu, 6, pause_flags, IDM_PAUSE_TOGGLE as usize, pause_text)
         .expect("Failed to insert pause menu item");
 
-    InsertMenuW(hmenu, 4, MF_BYPOSITION | MF_SEPARATOR, 0, PCWSTR::null())
-        .expect("Failed to insert separator");
-    InsertMenuW(hmenu, 5, MF_BYPOSITION | MF_STRING, IDM_SHOW_OVERLAY as usize, w!("Show Warning (5s)"))
-        .expect("Failed to insert menu item");
-    InsertMenuW(hmenu, 6, MF_BYPOSITION | MF_STRING, IDM_SHOW_BLOCKING as usize, w!("Show Blocking Overlay"))
-        .expect("Failed to insert menu item");
     InsertMenuW(hmenu, 7, MF_BYPOSITION | MF_SEPARATOR, 0, PCWSTR::null())
         .expect("Failed to insert separator");
-    InsertMenuW(hmenu, 8, MF_BYPOSITION | MF_STRING, IDM_ABOUT as usize, w!("About"))
+    InsertMenuW(hmenu, 8, MF_BYPOSITION | MF_STRING, IDM_SHOW_OVERLAY as usize, w!("Show Warning (5s)"))
         .expect("Failed to insert menu item");
-    InsertMenuW(hmenu, 9, MF_BYPOSITION | MF_STRING, IDM_QUIT as usize, w!("Quit"))
+    InsertMenuW(hmenu, 9, MF_BYPOSITION | MF_STRING, IDM_SHOW_BLOCKING as usize, w!("Show Blocking Overlay"))
+        .expect("Failed to insert menu item");
+    InsertMenuW(hmenu, 10, MF_BYPOSITION | MF_SEPARATOR, 0, PCWSTR::null())
+        .expect("Failed to insert separator");
+    InsertMenuW(hmenu, 11, MF_BYPOSITION | MF_STRING, IDM_ABOUT as usize, w!("About"))
+        .expect("Failed to insert menu item");
+    InsertMenuW(hmenu, 12, MF_BYPOSITION | MF_STRING, IDM_QUIT as usize, w!("Quit"))
         .expect("Failed to insert menu item");
 
     let mut point = zeroed();
@@ -218,6 +224,16 @@ pub unsafe extern "system" fn window_proc(
                 IDM_SETTINGS => {
                     if verify_passcode_for_quit(hwnd) {
                         show_settings_dialog(hwnd);
+                    }
+                }
+                IDM_EXTEND_15 => {
+                    if verify_passcode_for_quit(hwnd) {
+                        extend_time(15);
+                    }
+                }
+                IDM_EXTEND_45 => {
+                    if verify_passcode_for_quit(hwnd) {
+                        extend_time(45);
                     }
                 }
                 IDM_ABOUT => {
