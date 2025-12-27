@@ -21,7 +21,7 @@ use windows::{
 };
 
 use crate::constants::*;
-use crate::database::{get_passcode, get_setting, set_setting, WEEKDAY_KEYS, WEEKDAY_NAMES, get_pause_used_today, get_pause_config, get_pause_log_today, is_pause_enabled};
+use crate::database::{get_passcode, get_setting, set_setting, set_telegram_config, get_telegram_config, WEEKDAY_KEYS, WEEKDAY_NAMES, get_pause_used_today, get_pause_config, get_pause_log_today, is_pause_enabled};
 
 // Control IDs for settings dialog
 const ID_SETTINGS_BASE: i32 = 2000;
@@ -44,6 +44,10 @@ struct SettingsEditHandles {
     current_passcode: HWND,
     new_passcode: HWND,
     confirm_passcode: HWND,
+    // Telegram settings
+    telegram_token: HWND,
+    telegram_chat_id: HWND,
+    telegram_enabled: HWND,
 }
 
 /// Verify passcode before allowing sensitive operations
@@ -569,7 +573,81 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                     SendMessageW(h, EM_SETLIMITTEXT, WPARAM(4), LPARAM(0));
                     confirm_pass_hwnd = h;
                 }
-                y_pos += 40;
+                y_pos += 35;
+
+                // ===== Telegram Bot Section =====
+                let title6 = CreateWindowExW(
+                    WINDOW_EX_STYLE(0), w!("STATIC"), w!("Telegram Bot"),
+                    WS_CHILD | WS_VISIBLE, 15, y_pos, 360, 20, hwnd, HMENU::default(), hinstance, None,
+                );
+                if let Ok(h) = title6 { SendMessageW(h, WM_SETFONT, WPARAM(title_font.0 as usize), LPARAM(1)); }
+                y_pos += 25;
+
+                // Enable checkbox
+                let telegram_enabled_chk = CreateWindowExW(
+                    WINDOW_EX_STYLE(0), w!("BUTTON"), w!("Enable Telegram Bot"),
+                    WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    25, y_pos, 200, 20, hwnd, HMENU::default(), hinstance, None,
+                );
+                let mut telegram_enabled_hwnd = HWND::default();
+                if let Ok(h) = telegram_enabled_chk {
+                    SendMessageW(h, WM_SETFONT, WPARAM(label_font.0 as usize), LPARAM(1));
+                    let config = get_telegram_config();
+                    if config.enabled {
+                        SendMessageW(h, BM_SETCHECK, WPARAM(1), LPARAM(0));
+                    }
+                    telegram_enabled_hwnd = h;
+                }
+                y_pos += 25;
+
+                // Bot Token
+                let _ = CreateWindowExW(
+                    WINDOW_EX_STYLE(0), w!("STATIC"), w!("Bot Token:"),
+                    WS_CHILD | WS_VISIBLE, 25, y_pos + 2, 70, 20, hwnd, HMENU::default(), hinstance, None,
+                );
+                // Temporarily removed ES_PASSWORD for debugging
+                let telegram_token = CreateWindowExW(
+                    WINDOW_EX_STYLE(0x200), w!("EDIT"), w!(""),
+                    WS_CHILD | WS_VISIBLE | WS_BORDER | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    100, y_pos, 265, 24, hwnd, HMENU::default(), hinstance, None,
+                );
+                let mut telegram_token_hwnd = HWND::default();
+                if let Ok(h) = telegram_token {
+                    SendMessageW(h, WM_SETFONT, WPARAM(edit_font.0 as usize), LPARAM(1));
+                    // Allow long bot tokens (up to 200 chars)
+                    SendMessageW(h, EM_SETLIMITTEXT, WPARAM(200), LPARAM(0));
+                    eprintln!("[Settings] Set token field limit to 200");
+                    let config = get_telegram_config();
+                    if let Some(token) = config.bot_token {
+                        let wide: Vec<u16> = token.encode_utf16().chain(std::iter::once(0)).collect();
+                        SetWindowTextW(h, PCWSTR(wide.as_ptr())).ok();
+                    }
+                    telegram_token_hwnd = h;
+                }
+                y_pos += 28;
+
+                // Admin Chat ID
+                let _ = CreateWindowExW(
+                    WINDOW_EX_STYLE(0), w!("STATIC"), w!("Chat ID:"),
+                    WS_CHILD | WS_VISIBLE, 25, y_pos + 2, 70, 20, hwnd, HMENU::default(), hinstance, None,
+                );
+                let telegram_chat_id = CreateWindowExW(
+                    WINDOW_EX_STYLE(0x200), w!("EDIT"), w!(""),
+                    WS_CHILD | WS_VISIBLE | WS_BORDER | WINDOW_STYLE(ES_NUMBER as u32),
+                    100, y_pos, 120, 24, hwnd, HMENU::default(), hinstance, None,
+                );
+                let mut telegram_chat_id_hwnd = HWND::default();
+                if let Ok(h) = telegram_chat_id {
+                    SendMessageW(h, WM_SETFONT, WPARAM(edit_font.0 as usize), LPARAM(1));
+                    let config = get_telegram_config();
+                    if let Some(chat_id) = config.admin_chat_id {
+                        let value = chat_id.to_string();
+                        let wide: Vec<u16> = value.encode_utf16().chain(std::iter::once(0)).collect();
+                        SetWindowTextW(h, PCWSTR(wide.as_ptr())).ok();
+                    }
+                    telegram_chat_id_hwnd = h;
+                }
+                y_pos += 35;
 
                 // ===== Buttons =====
                 let btn_font = CreateFontW(
@@ -600,6 +678,9 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                     current_passcode: curr_pass_hwnd,
                     new_passcode: new_pass_hwnd,
                     confirm_passcode: confirm_pass_hwnd,
+                    telegram_token: telegram_token_hwnd,
+                    telegram_chat_id: telegram_chat_id_hwnd,
+                    telegram_enabled: telegram_enabled_hwnd,
                 });
 
                 LRESULT(0)
@@ -697,6 +778,34 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                             let value = String::from_utf16_lossy(&buffer[..len as usize]);
                             set_setting("blocking_message", &value);
                         }
+
+                        // Save Telegram settings
+                        let mut telegram_token = String::new();
+                        let mut telegram_chat_id = String::new();
+                        let telegram_enabled;
+
+                        if !handles.telegram_token.0.is_null() {
+                            let mut buffer = [0u16; 512];
+                            let len = GetWindowTextW(handles.telegram_token, &mut buffer);
+                            eprintln!("[Settings] Token field length: {}", len);
+                            telegram_token = String::from_utf16_lossy(&buffer[..len as usize]);
+                            eprintln!("[Settings] Token read: {} (len={})", telegram_token, telegram_token.len());
+                        }
+
+                        if !handles.telegram_chat_id.0.is_null() {
+                            let mut buffer = [0u16; 64];
+                            let len = GetWindowTextW(handles.telegram_chat_id, &mut buffer);
+                            telegram_chat_id = String::from_utf16_lossy(&buffer[..len as usize]);
+                        }
+
+                        if !handles.telegram_enabled.0.is_null() {
+                            let checked = SendMessageW(handles.telegram_enabled, BM_GETCHECK, WPARAM(0), LPARAM(0));
+                            telegram_enabled = checked.0 == 1;
+                        } else {
+                            telegram_enabled = false;
+                        }
+
+                        set_telegram_config(&telegram_token, &telegram_chat_id, telegram_enabled);
                     }
 
                     MessageBoxW(hwnd, w!("Settings saved successfully!"), w!("Settings"), MB_OK | MB_ICONINFORMATION);
@@ -735,7 +844,7 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
     let screen_width = GetSystemMetrics(SM_CXSCREEN);
     let screen_height = GetSystemMetrics(SM_CYSCREEN);
     let dialog_width = 400;
-    let dialog_height = 620;
+    let dialog_height = 740;
 
     let dialog_hwnd = CreateWindowExW(
         WS_EX_TOPMOST | WS_EX_DLGMODALFRAME,

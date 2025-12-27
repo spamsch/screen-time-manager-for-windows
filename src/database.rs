@@ -360,3 +360,38 @@ pub fn get_pause_log_today() -> Vec<String> {
         .map(|s| s.split(',').map(|e| e.to_string()).collect())
         .unwrap_or_default()
 }
+
+// ============================================================================
+// Telegram Bot Configuration
+// ============================================================================
+
+/// Settings keys for Telegram bot
+const TELEGRAM_BOT_TOKEN: &str = "telegram_bot_token";
+const TELEGRAM_ADMIN_CHAT_ID: &str = "telegram_admin_chat_id";
+const TELEGRAM_ENABLED: &str = "telegram_enabled";
+
+/// Telegram bot configuration
+pub struct TelegramConfig {
+    pub bot_token: Option<String>,
+    pub admin_chat_id: Option<i64>,
+    pub enabled: bool,
+}
+
+/// Get Telegram bot configuration
+pub fn get_telegram_config() -> TelegramConfig {
+    TelegramConfig {
+        bot_token: get_setting(TELEGRAM_BOT_TOKEN),
+        admin_chat_id: get_setting(TELEGRAM_ADMIN_CHAT_ID)
+            .and_then(|s| s.parse::<i64>().ok()),
+        enabled: get_setting(TELEGRAM_ENABLED)
+            .map(|s| s == "true")
+            .unwrap_or(false),
+    }
+}
+
+/// Save Telegram bot configuration
+pub fn set_telegram_config(token: &str, chat_id: &str, enabled: bool) {
+    set_setting(TELEGRAM_BOT_TOKEN, token);
+    set_setting(TELEGRAM_ADMIN_CHAT_ID, chat_id);
+    set_setting(TELEGRAM_ENABLED, if enabled { "true" } else { "false" });
+}

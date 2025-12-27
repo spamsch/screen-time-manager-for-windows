@@ -28,6 +28,10 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 # For finding app data directories
 dirs = "5.0"
 
+# Telegram bot
+teloxide = { version = "0.13", features = ["macros"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
+
 [build-dependencies]
 embed-resource = "2.4"
 

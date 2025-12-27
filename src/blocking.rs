@@ -45,6 +45,11 @@ pub static PASSCODE_ERROR: AtomicBool = AtomicBool::new(false);
 /// Remaining time in seconds (negative means no limit/extension active)
 pub static REMAINING_SECONDS: AtomicI32 = AtomicI32::new(-1);
 
+/// Get remaining time in seconds
+pub fn get_remaining_seconds() -> i32 {
+    REMAINING_SECONDS.load(Ordering::SeqCst)
+}
+
 /// Timer IDs
 pub const TIMER_REASSERT_TOPMOST: usize = 2;
 pub const TIMER_COUNTDOWN: usize = 3;

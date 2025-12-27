@@ -23,6 +23,7 @@ use crate::database::{get_blocking_message, get_warning_config, is_pause_enabled
 use crate::dialogs::{show_settings_dialog, show_stats_dialog, verify_passcode_for_quit};
 use crate::mini_overlay::{is_paused, can_pause, toggle_pause, PauseBlockedReason, get_remaining_pause_budget};
 use crate::overlay::{show_overlay, OVERLAY_HWND};
+use crate::telegram;
 use std::sync::atomic::Ordering;
 
 /// Global state for the notification icon data
@@ -254,6 +255,9 @@ pub unsafe extern "system" fn window_proc(
             LRESULT(0)
         }
         WM_DESTROY => {
+            // Signal Telegram bot to shut down (sends shutdown notification)
+            telegram::signal_shutdown();
+
             let overlay_hwnd = HWND(OVERLAY_HWND.load(Ordering::SeqCst));
             if !overlay_hwnd.0.is_null() {
                 DestroyWindow(overlay_hwnd).ok();

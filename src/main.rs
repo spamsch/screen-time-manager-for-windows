@@ -3,7 +3,8 @@
 //! This application runs in the background with only a system tray icon visible.
 //! Right-clicking the icon shows a context menu with options including quit.
 
-#![windows_subsystem = "windows"]
+// Temporarily use console for debugging (change back to "windows" for release)
+#![windows_subsystem = "console"]
 
 mod blocking;
 mod constants;
@@ -11,6 +12,7 @@ mod database;
 mod dialogs;
 mod mini_overlay;
 mod overlay;
+mod telegram;
 mod tray;
 
 use std::mem::zeroed;
@@ -125,6 +127,9 @@ fn main() {
 
         // Add the system tray icon
         add_tray_icon(hwnd);
+
+        // Start Telegram bot in background thread (if configured)
+        telegram::start_bot_thread();
 
         // Message loop
         let mut msg: MSG = zeroed();
