@@ -338,8 +338,16 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
 
                 let mut daily_handles: [HWND; 7] = [HWND::default(); 7];
 
-                for (i, day_name) in WEEKDAY_NAMES.iter().enumerate() {
-                    let label_text: Vec<u16> = format!("{}:\0", day_name).encode_utf16().collect();
+                // Create day controls in pairs (two columns per row)
+                // Row 0: Monday (0), Tuesday (1)
+                // Row 1: Wednesday (2), Thursday (3)
+                // Row 2: Friday (4), Saturday (5)
+                // Row 3: Sunday (6) alone
+                for row in 0..4 {
+                    let i = row * 2; // First column day index
+
+                    // First column
+                    let label_text: Vec<u16> = format!("{}:\0", WEEKDAY_NAMES[i]).encode_utf16().collect();
                     let label = CreateWindowExW(
                         WINDOW_EX_STYLE(0), w!("STATIC"), PCWSTR(label_text.as_ptr()),
                         WS_CHILD | WS_VISIBLE, 25, y_pos + 2, 90, 20, hwnd, HMENU::default(), hinstance, None,
@@ -360,36 +368,32 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                         daily_handles[i] = h;
                     }
 
-                    // Second column
-                    if i < 6 {
-                        let i2 = i + 1;
-                        if i2 < 7 {
-                            let label_text2: Vec<u16> = format!("{}:\0", WEEKDAY_NAMES[i2]).encode_utf16().collect();
-                            let label2 = CreateWindowExW(
-                                WINDOW_EX_STYLE(0), w!("STATIC"), PCWSTR(label_text2.as_ptr()),
-                                WS_CHILD | WS_VISIBLE, 210, y_pos + 2, 90, 20, hwnd, HMENU::default(), hinstance, None,
-                            );
-                            if let Ok(h) = label2 { SendMessageW(h, WM_SETFONT, WPARAM(label_font.0 as usize), LPARAM(1)); }
+                    // Second column (only if there's a second day in this row)
+                    let i2 = i + 1;
+                    if i2 < 7 {
+                        let label_text2: Vec<u16> = format!("{}:\0", WEEKDAY_NAMES[i2]).encode_utf16().collect();
+                        let label2 = CreateWindowExW(
+                            WINDOW_EX_STYLE(0), w!("STATIC"), PCWSTR(label_text2.as_ptr()),
+                            WS_CHILD | WS_VISIBLE, 210, y_pos + 2, 90, 20, hwnd, HMENU::default(), hinstance, None,
+                        );
+                        if let Ok(h) = label2 { SendMessageW(h, WM_SETFONT, WPARAM(label_font.0 as usize), LPARAM(1)); }
 
-                            let edit2 = CreateWindowExW(
-                                WINDOW_EX_STYLE(0x200), w!("EDIT"), w!(""),
-                                WS_CHILD | WS_VISIBLE | WS_BORDER | WINDOW_STYLE(ES_NUMBER as u32 | ES_CENTER as u32),
-                                305, y_pos, 60, 24, hwnd, HMENU((ID_SETTINGS_BASE + i2 as i32) as _), hinstance, None,
-                            );
-                            if let Ok(h) = edit2 {
-                                SendMessageW(h, WM_SETFONT, WPARAM(edit_font.0 as usize), LPARAM(1));
-                                SendMessageW(h, EM_SETLIMITTEXT, WPARAM(4), LPARAM(0));
-                                let value = get_setting(WEEKDAY_KEYS[i2]).unwrap_or_else(|| "120".to_string());
-                                let wide: Vec<u16> = value.encode_utf16().chain(std::iter::once(0)).collect();
-                                SetWindowTextW(h, PCWSTR(wide.as_ptr())).ok();
-                                daily_handles[i2] = h;
-                            }
+                        let edit2 = CreateWindowExW(
+                            WINDOW_EX_STYLE(0x200), w!("EDIT"), w!(""),
+                            WS_CHILD | WS_VISIBLE | WS_BORDER | WINDOW_STYLE(ES_NUMBER as u32 | ES_CENTER as u32),
+                            305, y_pos, 60, 24, hwnd, HMENU((ID_SETTINGS_BASE + i2 as i32) as _), hinstance, None,
+                        );
+                        if let Ok(h) = edit2 {
+                            SendMessageW(h, WM_SETFONT, WPARAM(edit_font.0 as usize), LPARAM(1));
+                            SendMessageW(h, EM_SETLIMITTEXT, WPARAM(4), LPARAM(0));
+                            let value = get_setting(WEEKDAY_KEYS[i2]).unwrap_or_else(|| "120".to_string());
+                            let wide: Vec<u16> = value.encode_utf16().chain(std::iter::once(0)).collect();
+                            SetWindowTextW(h, PCWSTR(wide.as_ptr())).ok();
+                            daily_handles[i2] = h;
                         }
                     }
 
-                    if i % 2 == 1 || i == 6 {
-                        y_pos += 30;
-                    }
+                    y_pos += 30;
                 }
                 y_pos += 5;
 
