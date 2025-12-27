@@ -605,10 +605,9 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                     WINDOW_EX_STYLE(0), w!("STATIC"), w!("Bot Token:"),
                     WS_CHILD | WS_VISIBLE, 25, y_pos + 2, 70, 20, hwnd, HMENU::default(), hinstance, None,
                 );
-                // Temporarily removed ES_PASSWORD for debugging
                 let telegram_token = CreateWindowExW(
                     WINDOW_EX_STYLE(0x200), w!("EDIT"), w!(""),
-                    WS_CHILD | WS_VISIBLE | WS_BORDER | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    WS_CHILD | WS_VISIBLE | WS_BORDER | WINDOW_STYLE(ES_PASSWORD as u32 | ES_AUTOHSCROLL as u32),
                     100, y_pos, 265, 24, hwnd, HMENU::default(), hinstance, None,
                 );
                 let mut telegram_token_hwnd = HWND::default();
@@ -616,7 +615,6 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                     SendMessageW(h, WM_SETFONT, WPARAM(edit_font.0 as usize), LPARAM(1));
                     // Allow long bot tokens (up to 200 chars)
                     SendMessageW(h, EM_SETLIMITTEXT, WPARAM(200), LPARAM(0));
-                    eprintln!("[Settings] Set token field limit to 200");
                     let config = get_telegram_config();
                     if let Some(token) = config.bot_token {
                         let wide: Vec<u16> = token.encode_utf16().chain(std::iter::once(0)).collect();
@@ -787,9 +785,7 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                         if !handles.telegram_token.0.is_null() {
                             let mut buffer = [0u16; 512];
                             let len = GetWindowTextW(handles.telegram_token, &mut buffer);
-                            eprintln!("[Settings] Token field length: {}", len);
                             telegram_token = String::from_utf16_lossy(&buffer[..len as usize]);
-                            eprintln!("[Settings] Token read: {} (len={})", telegram_token, telegram_token.len());
                         }
 
                         if !handles.telegram_chat_id.0.is_null() {

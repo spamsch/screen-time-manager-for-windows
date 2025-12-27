@@ -3,8 +3,7 @@
 //! This application runs in the background with only a system tray icon visible.
 //! Right-clicking the icon shows a context menu with options including quit.
 
-// Temporarily use console for debugging (change back to "windows" for release)
-#![windows_subsystem = "console"]
+#![windows_subsystem = "windows"]
 
 mod blocking;
 mod constants;
@@ -115,6 +114,10 @@ fn main() {
             (get_daily_limit(weekday) * 60) as i32  // Convert minutes to seconds
         });
         REMAINING_SECONDS.store(remaining, Ordering::SeqCst);
+
+        // Initialize session active time from database
+        let session_active = database::get_session_active_time();
+        mini_overlay::SESSION_ACTIVE_SECONDS.store(session_active, Ordering::SeqCst);
 
         // Show the mini overlay with remaining time
         show_mini_overlay();

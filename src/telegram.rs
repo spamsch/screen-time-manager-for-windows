@@ -63,9 +63,6 @@ pub fn start_bot_thread() {
     }
 
     let admin_chat_id = config.admin_chat_id;
-    eprintln!("[Telegram] Starting bot thread...");
-    eprintln!("[Telegram] Token: {}", token);
-    eprintln!("[Telegram] Admin chat ID: {:?}", admin_chat_id);
 
     // Store admin chat ID for notifications
     if let Some(id) = admin_chat_id {
@@ -73,12 +70,10 @@ pub fn start_bot_thread() {
     }
 
     std::thread::spawn(move || {
-        eprintln!("[Telegram] Bot thread started");
         let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
         rt.block_on(async {
             run_bot(token, admin_chat_id).await;
         });
-        eprintln!("[Telegram] Bot thread ended");
     });
 }
 
@@ -104,7 +99,6 @@ pub fn signal_shutdown() {
 
 /// Main bot loop
 async fn run_bot(token: String, admin_chat_id: Option<i64>) {
-    eprintln!("[Telegram] Initializing bot...");
     let bot = Bot::new(&token);
 
     // Store bot instance for notifications
@@ -112,14 +106,8 @@ async fn run_bot(token: String, admin_chat_id: Option<i64>) {
 
     // Send startup notification
     if let Some(chat_id) = admin_chat_id {
-        eprintln!("[Telegram] Sending startup notification to chat {}", chat_id);
-        match bot.send_message(ChatId(chat_id), "Screen Time Manager started").await {
-            Ok(_) => eprintln!("[Telegram] Startup notification sent successfully"),
-            Err(e) => eprintln!("[Telegram] Failed to send startup notification: {}", e),
-        }
+        let _ = bot.send_message(ChatId(chat_id), "Screen Time Manager started").await;
     }
-
-    eprintln!("[Telegram] Setting up command handlers...");
 
     // Command handler
     let command_handler = Update::filter_message()
@@ -168,9 +156,7 @@ async fn run_bot(token: String, admin_chat_id: Option<i64>) {
     });
 
     // Run dispatcher
-    eprintln!("[Telegram] Bot is now running and listening for commands...");
     dispatcher.dispatch().await;
-    eprintln!("[Telegram] Dispatcher stopped");
 }
 
 /// Handle incoming commands
@@ -181,7 +167,6 @@ async fn handle_command(
     admin_chat_id: Option<i64>,
 ) -> ResponseResult<()> {
     let sender_id = msg.chat.id.0;
-    eprintln!("[Telegram] Received command {:?} from chat {}", cmd, sender_id);
 
     // For /start and /chatid commands, always respond (helps with setup)
     match &cmd {
@@ -322,14 +307,27 @@ fn cmd_resume() -> String {
 }
 
 fn cmd_history() -> String {
+    use std::sync::atomic::Ordering;
+
     let log = database::get_pause_log_today();
     let pause_used = database::get_pause_used_today();
     let pause_config = database::get_pause_config();
+    let session_active = mini_overlay::SESSION_ACTIVE_SECONDS.load(Ordering::SeqCst);
 
     let mut response = String::from("📊 Today's Activity\n━━━━━━━━━━━━━━━━━━\n");
 
+    // Format uptime
+    let hours = session_active / 3600;
+    let minutes = (session_active % 3600) / 60;
+    let seconds = session_active % 60;
+    if hours > 0 {
+        response.push_str(&format!("⏱ Uptime: {}h {}m {}s\n", hours, minutes, seconds));
+    } else {
+        response.push_str(&format!("⏱ Uptime: {}m {}s\n", minutes, seconds));
+    }
+
     response.push_str(&format!(
-        "Pause used: {} / {} min\n\n",
+        "⏸ Pause used: {} / {} min\n\n",
         pause_used / 60,
         pause_config.daily_budget_minutes
     ));
