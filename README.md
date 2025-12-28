@@ -23,13 +23,23 @@ No complicated setup. No special accounts needed. Just run it and configure your
 
 1. **Run the app** - Double-click to start. A small timer appears in the top-right corner.
 
-2. **Open Settings** - Right-click the clock icon in the system tray (bottom-right, near the clock) and select "Settings..."
+2. **Find the tray icon** - Look for the clock icon in the system tray (bottom-right of your screen, near the clock).
 
-3. **Enter the passcode** - Default is `0000`. Change it to something your child won't guess!
+   ![System tray icon](images/tray.png)
 
-4. **Set time limits** - Choose how many minutes are allowed each day.
+3. **Open the menu** - Right-click the tray icon to see all options.
 
-5. **Done!** - The app will track time and block the screen when the limit is reached.
+   ![Tray menu](images/menu.png)
+
+4. **Open Settings** - Click "Settings..." and enter the passcode (default is `0000`).
+
+   ![Passcode entry](images/passcode-entry.png)
+
+5. **Configure your limits** - Set daily time limits, warning messages, and optionally set up Telegram remote control.
+
+   ![Settings dialog](images/settings.png)
+
+6. **Change the passcode** - Use the "Change Passcode" section to set something your child won't guess!
 
 ---
 
@@ -39,7 +49,7 @@ A "Time's Up!" screen appears. Your child will see:
 
 - **Extend buttons** (+15, +30, +60 min) - Enter passcode to grant more time
 - **Unlock button** - Enter passcode to remove the block completely
-- **Shut Down button** - Enter passcode to turn off the computer
+- **Shut Down button** - Shut down the computer (with confirmation)
 
 ---
 
