@@ -66,6 +66,32 @@ Right-click the tray icon and select "Today's Stats..." to see:
 
 ---
 
+## Remote Control via Telegram (Optional)
+
+You can monitor and control screen time from your phone using Telegram. This is useful when you're not near the computer.
+
+**What you can do from Telegram:**
+- `/status` - Check remaining time and pause status
+- `/time` - Quick time check
+- `/extend 30` - Add extra time (e.g., 30 minutes)
+- `/pause` - Pause the timer
+- `/resume` - Resume the timer
+- `/history` - See today's pause activity
+
+**Setup (one-time):**
+
+1. Open Telegram and search for **@BotFather**
+2. Send `/newbot` and follow the steps to create your bot
+3. Copy the **bot token** you receive
+4. Start a chat with your new bot and send `/start`
+5. Note your **chat ID** shown in the reply
+6. In Screen Time Manager settings, scroll to "Telegram Bot" section
+7. Paste your bot token and chat ID, then enable the bot
+
+Once configured, only you can control the bot - it ignores messages from anyone else.
+
+---
+
 ## Tips
 
 - **Change the default passcode** - The default `0000` is easy to guess!

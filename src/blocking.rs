@@ -618,20 +618,16 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                         }
                     }
                     ID_SHUTDOWN_BUTTON => {
-                        // Require passcode for shutdown
-                        if check_blocking_passcode() {
+                        // Show confirmation dialog
+                        let result = MessageBoxW(
+                            hwnd,
+                            w!("Are you sure you want to shut down the computer?"),
+                            w!("Confirm Shutdown"),
+                            MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2,
+                        );
+                        if result == IDYES {
                             // Initiate system shutdown
                             let _ = ExitWindowsEx(EWX_SHUTDOWN, SHUTDOWN_REASON(0));
-                        } else {
-                            PASSCODE_ERROR.store(true, Ordering::SeqCst);
-                            let _ = InvalidateRect(hwnd, None, false);
-                            let edit_ptr = BLOCKING_EDIT_HWND.load(Ordering::SeqCst);
-                            if !edit_ptr.is_null() {
-                                let edit = HWND(edit_ptr);
-                                SetWindowTextW(edit, w!("")).ok();
-                                let _ = SetFocus(edit);
-                            }
-                            let _ = PlaySoundW(w!("SystemExclamation"), None, SND_ALIAS | SND_ASYNC);
                         }
                     }
                     _ => {}
