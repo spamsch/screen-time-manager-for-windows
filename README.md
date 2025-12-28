@@ -45,7 +45,9 @@ No complicated setup. No special accounts needed. Just run it and configure your
 
 ## When Time Runs Out
 
-A "Time's Up!" screen appears. Your child will see:
+A "Time's Up!" screen appears that blocks the entire computer.
+
+![Lock screen](images/lock-screen.png)
 
 - **Extend buttons** (+15, +30, +60 min) - Enter passcode to grant more time
 - **Unlock button** - Enter passcode to remove the block completely
