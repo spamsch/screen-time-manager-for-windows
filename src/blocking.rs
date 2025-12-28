@@ -16,6 +16,7 @@ use windows::{
         },
         Media::Audio::{PlaySoundW, SND_ALIAS, SND_ASYNC},
         System::LibraryLoader::GetModuleHandleW,
+        System::Shutdown::{ExitWindowsEx, EWX_SHUTDOWN, SHUTDOWN_REASON},
         UI::{
             Controls::*,
             Input::KeyboardAndMouse::{SetFocus, VK_RETURN},
@@ -60,6 +61,7 @@ const ID_UNLOCK_BUTTON: i32 = 102;
 const ID_EXTEND_15: i32 = 103;
 const ID_EXTEND_30: i32 = 104;
 const ID_EXTEND_60: i32 = 105;
+const ID_SHUTDOWN_BUTTON: i32 = 106;
 
 pub unsafe fn create_blocking_overlay(hinstance: windows::Win32::Foundation::HMODULE) {
     let class_name = w!("ScreenTimeBlockingClass");
@@ -231,7 +233,7 @@ pub unsafe extern "system" fn blocking_overlay_proc(
 
             // Expanded panel dimensions
             let panel_width = 500;
-            let panel_height = 480;
+            let panel_height = 530;
             let _panel_x = (screen_width - panel_width) / 2;
             let panel_y = (screen_height - panel_height) / 2;
 
@@ -364,6 +366,26 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                 None,
             );
 
+            // Shutdown button
+            let shutdown_btn_y = btn_y + btn_height + 15;
+            let shutdown_btn = CreateWindowExW(
+                WINDOW_EX_STYLE(0),
+                w!("BUTTON"),
+                w!("Shut Down"),
+                WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_PUSHBUTTON as u32),
+                btn_x,
+                shutdown_btn_y,
+                btn_width,
+                btn_height,
+                hwnd,
+                HMENU(ID_SHUTDOWN_BUTTON as _),
+                hinstance,
+                None,
+            );
+            if let Ok(h) = shutdown_btn {
+                SendMessageW(h, WM_SETFONT, WPARAM(btn_font.0 as usize), LPARAM(1));
+            }
+
             LRESULT(0)
         }
         WM_PAINT => {
@@ -382,7 +404,7 @@ pub unsafe extern "system" fn blocking_overlay_proc(
 
             // Expanded panel with more margin
             let panel_width = 500;
-            let panel_height = 480;
+            let panel_height = 530;
             let panel_x = (screen_width - panel_width) / 2;
             let panel_y = (screen_height - panel_height) / 2;
 
@@ -583,6 +605,23 @@ pub unsafe extern "system" fn blocking_overlay_proc(
 
                             // Hide overlay and let the user continue
                             hide_blocking_overlay();
+                        } else {
+                            PASSCODE_ERROR.store(true, Ordering::SeqCst);
+                            let _ = InvalidateRect(hwnd, None, false);
+                            let edit_ptr = BLOCKING_EDIT_HWND.load(Ordering::SeqCst);
+                            if !edit_ptr.is_null() {
+                                let edit = HWND(edit_ptr);
+                                SetWindowTextW(edit, w!("")).ok();
+                                let _ = SetFocus(edit);
+                            }
+                            let _ = PlaySoundW(w!("SystemExclamation"), None, SND_ALIAS | SND_ASYNC);
+                        }
+                    }
+                    ID_SHUTDOWN_BUTTON => {
+                        // Require passcode for shutdown
+                        if check_blocking_passcode() {
+                            // Initiate system shutdown
+                            let _ = ExitWindowsEx(EWX_SHUTDOWN, SHUTDOWN_REASON(0));
                         } else {
                             PASSCODE_ERROR.store(true, Ordering::SeqCst);
                             let _ = InvalidateRect(hwnd, None, false);
