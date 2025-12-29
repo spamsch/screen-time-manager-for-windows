@@ -4,6 +4,7 @@ version = "1.0.28"
 edition = "2021"
 description = "A screen time management application that runs in the system tray"
 authors = ["Shadow"]
+license = "MIT"
 
 [dependencies]
 # Windows API bindings
