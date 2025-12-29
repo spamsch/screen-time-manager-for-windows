@@ -274,6 +274,11 @@ fn cmd_extend(minutes: i32) -> String {
 
     blocking::extend_time(minutes);
 
+    // Hide the blocking overlay if it's showing
+    unsafe {
+        blocking::hide_blocking_overlay();
+    }
+
     // Get new remaining time
     let remaining = blocking::get_remaining_seconds();
     let new_mins = remaining / 60;
