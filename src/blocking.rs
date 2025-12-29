@@ -46,6 +46,9 @@ pub static PASSCODE_ERROR: AtomicBool = AtomicBool::new(false);
 /// Remaining time in seconds (negative means no limit/extension active)
 pub static REMAINING_SECONDS: AtomicI32 = AtomicI32::new(-1);
 
+/// Shutdown countdown in seconds (negative means inactive)
+pub static SHUTDOWN_COUNTDOWN_SECONDS: AtomicI32 = AtomicI32::new(-1);
+
 /// Get remaining time in seconds
 pub fn get_remaining_seconds() -> i32 {
     REMAINING_SECONDS.load(Ordering::SeqCst)
@@ -110,6 +113,10 @@ pub unsafe fn show_blocking_overlay_with_time(text: &str, remaining_seconds: i32
     if remaining_seconds >= 0 {
         REMAINING_SECONDS.store(remaining_seconds, Ordering::SeqCst);
     }
+
+    // Initialize shutdown countdown from database setting
+    let timeout = crate::database::get_lock_screen_timeout();
+    SHUTDOWN_COUNTDOWN_SECONDS.store(timeout, Ordering::SeqCst);
 
     let edit_ptr = BLOCKING_EDIT_HWND.load(Ordering::SeqCst);
     if !edit_ptr.is_null() {
@@ -187,6 +194,9 @@ pub unsafe fn hide_blocking_overlay() {
     let _ = KillTimer(hwnd, TIMER_COUNTDOWN);
     let _ = ShowWindow(hwnd, SW_HIDE);
     *BLOCKING_TEXT.lock().unwrap() = None;
+
+    // Reset shutdown countdown
+    SHUTDOWN_COUNTDOWN_SECONDS.store(-1, Ordering::SeqCst);
 
     // Hide secondary monitor overlays
     hide_secondary_overlays();
@@ -444,8 +454,9 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                 DT_CENTER | DT_SINGLELINE,
             );
 
-            // Remaining time display
+            // Remaining time display (or shutdown countdown warning)
             let remaining = REMAINING_SECONDS.load(Ordering::SeqCst);
+            let shutdown_countdown = SHUTDOWN_COUNTDOWN_SECONDS.load(Ordering::SeqCst);
             let time_font = CreateFontW(
                 36, 0, 0, 0,
                 FW_BOLD.0 as i32,
@@ -453,11 +464,16 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                 w!("Segoe UI"),
             );
             SelectObject(hdc, time_font);
-            SetTextColor(hdc, COLORREF(COLOR_ACCENT));
 
-            let time_str = if remaining >= 0 {
+            // Show shutdown warning in red when <= 60 seconds remain
+            let time_str = if shutdown_countdown >= 0 && shutdown_countdown <= 60 {
+                SetTextColor(hdc, COLORREF(0x0000FF)); // Red (BGR format)
+                format!("SHUTDOWN IN: {}s", shutdown_countdown)
+            } else if remaining >= 0 {
+                SetTextColor(hdc, COLORREF(COLOR_ACCENT));
                 format!("Remaining: {}", format_time(remaining))
             } else {
+                SetTextColor(hdc, COLORREF(COLOR_ACCENT));
                 String::from("Time limit exceeded")
             };
             let mut time_rect = RECT {
@@ -646,7 +662,16 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                     ).ok();
                 }
                 TIMER_COUNTDOWN => {
-                    // Just redraw to update time display (mini overlay handles countdown)
+                    // Decrement shutdown countdown
+                    let shutdown_remaining = SHUTDOWN_COUNTDOWN_SECONDS.load(Ordering::SeqCst);
+                    if shutdown_remaining > 0 {
+                        SHUTDOWN_COUNTDOWN_SECONDS.store(shutdown_remaining - 1, Ordering::SeqCst);
+                    } else if shutdown_remaining == 0 {
+                        // Trigger shutdown
+                        let _ = ExitWindowsEx(EWX_SHUTDOWN, SHUTDOWN_REASON(0));
+                    }
+
+                    // Redraw to update time display
                     // Use false to avoid erasing background (prevents flickering)
                     let _ = InvalidateRect(hwnd, None, false);
                 }

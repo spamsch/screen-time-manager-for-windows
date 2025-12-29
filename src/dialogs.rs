@@ -48,6 +48,8 @@ struct SettingsEditHandles {
     telegram_token: HWND,
     telegram_chat_id: HWND,
     telegram_enabled: HWND,
+    // Lock screen timeout
+    lock_screen_timeout: HWND,
 }
 
 /// Verify passcode before allowing sensitive operations
@@ -647,6 +649,37 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                 }
                 y_pos += 35;
 
+                // ===== Lock Screen Timeout =====
+                let title7 = CreateWindowExW(
+                    WINDOW_EX_STYLE(0), w!("STATIC"), w!("Lock Screen"),
+                    WS_CHILD | WS_VISIBLE, 15, y_pos, 360, 20, hwnd, HMENU::default(), hinstance, None,
+                );
+                if let Ok(h) = title7 { SendMessageW(h, WM_SETFONT, WPARAM(title_font.0 as usize), LPARAM(1)); }
+                y_pos += 25;
+
+                // Lock screen timeout input
+                let _ = CreateWindowExW(
+                    WINDOW_EX_STYLE(0), w!("STATIC"), w!("Shutdown timeout (minutes):"),
+                    WS_CHILD | WS_VISIBLE, 25, y_pos + 2, 170, 20, hwnd, HMENU::default(), hinstance, None,
+                );
+                let lock_timeout_edit = CreateWindowExW(
+                    WINDOW_EX_STYLE(0x200), w!("EDIT"), w!(""),
+                    WS_CHILD | WS_VISIBLE | WS_BORDER | WINDOW_STYLE(ES_NUMBER as u32),
+                    200, y_pos, 60, 24, hwnd, HMENU::default(), hinstance, None,
+                );
+                let mut lock_timeout_hwnd = HWND::default();
+                if let Ok(h) = lock_timeout_edit {
+                    SendMessageW(h, WM_SETFONT, WPARAM(edit_font.0 as usize), LPARAM(1));
+                    // Load current value (convert seconds to minutes for display)
+                    let timeout_secs = crate::database::get_lock_screen_timeout();
+                    let timeout_mins = timeout_secs / 60;
+                    let value = timeout_mins.to_string();
+                    let wide: Vec<u16> = value.encode_utf16().chain(std::iter::once(0)).collect();
+                    SetWindowTextW(h, PCWSTR(wide.as_ptr())).ok();
+                    lock_timeout_hwnd = h;
+                }
+                y_pos += 35;
+
                 // ===== Buttons =====
                 let btn_font = CreateFontW(
                     16, 0, 0, 0, FW_NORMAL.0 as i32, 0, 0, 0, 0, 0, 0, 0, 0, w!("Segoe UI"),
@@ -679,6 +712,7 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                     telegram_token: telegram_token_hwnd,
                     telegram_chat_id: telegram_chat_id_hwnd,
                     telegram_enabled: telegram_enabled_hwnd,
+                    lock_screen_timeout: lock_timeout_hwnd,
                 });
 
                 LRESULT(0)
@@ -802,6 +836,17 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                         }
 
                         set_telegram_config(&telegram_token, &telegram_chat_id, telegram_enabled);
+
+                        // Save lock screen timeout (convert minutes to seconds)
+                        if !handles.lock_screen_timeout.0.is_null() {
+                            let mut buffer = [0u16; 16];
+                            let len = GetWindowTextW(handles.lock_screen_timeout, &mut buffer);
+                            let value = String::from_utf16_lossy(&buffer[..len as usize]);
+                            if let Ok(minutes) = value.parse::<i32>() {
+                                let seconds = minutes * 60;
+                                set_setting("lock_screen_timeout", &seconds.to_string());
+                            }
+                        }
                     }
 
                     MessageBoxW(hwnd, w!("Settings saved successfully!"), w!("Settings"), MB_OK | MB_ICONINFORMATION);

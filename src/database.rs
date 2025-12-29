@@ -83,6 +83,8 @@ pub fn init_database() -> Result<(), Box<dyn std::error::Error>> {
         ("pause_max_duration", "20"),        // Max minutes per single pause
         ("pause_cooldown", "15"),            // Minutes between pauses
         ("pause_min_active_time", "10"),     // Min minutes before first pause allowed
+        // Lock screen timeout (seconds before shutdown, default 10 minutes)
+        ("lock_screen_timeout", "600"),
     ];
 
     for (key, value) in defaults {
@@ -229,6 +231,17 @@ pub fn get_current_weekday() -> u32 {
     } else {
         (st.wDayOfWeek - 1) as u32
     }
+}
+
+// ============================================================================
+// Lock Screen Timeout Functions
+// ============================================================================
+
+/// Get lock screen timeout in seconds (time before shutdown when lock screen is active)
+pub fn get_lock_screen_timeout() -> i32 {
+    get_setting("lock_screen_timeout")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(600) // 10 minutes default
 }
 
 // ============================================================================
