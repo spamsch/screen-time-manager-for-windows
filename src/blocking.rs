@@ -454,8 +454,7 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                 DT_CENTER | DT_SINGLELINE,
             );
 
-            // Remaining time display (or shutdown countdown warning)
-            let remaining = REMAINING_SECONDS.load(Ordering::SeqCst);
+            // Shutdown countdown display
             let shutdown_countdown = SHUTDOWN_COUNTDOWN_SECONDS.load(Ordering::SeqCst);
             let time_font = CreateFontW(
                 36, 0, 0, 0,
@@ -465,13 +464,15 @@ pub unsafe extern "system" fn blocking_overlay_proc(
             );
             SelectObject(hdc, time_font);
 
-            // Show shutdown warning in red when <= 60 seconds remain
-            let time_str = if shutdown_countdown >= 0 && shutdown_countdown <= 60 {
-                SetTextColor(hdc, COLORREF(0x0000FF)); // Red (BGR format)
-                format!("SHUTDOWN IN: {}s", shutdown_countdown)
-            } else if remaining >= 0 {
-                SetTextColor(hdc, COLORREF(COLOR_ACCENT));
-                format!("Remaining: {}", format_time(remaining))
+            // Show shutdown countdown - red when <= 60 seconds remain
+            let time_str = if shutdown_countdown >= 0 {
+                if shutdown_countdown <= 60 {
+                    SetTextColor(hdc, COLORREF(0x0000FF)); // Red (BGR format)
+                    format!("SHUTDOWN IN: {}s", shutdown_countdown)
+                } else {
+                    SetTextColor(hdc, COLORREF(COLOR_ACCENT));
+                    format!("Shutdown in: {}", format_time(shutdown_countdown))
+                }
             } else {
                 SetTextColor(hdc, COLORREF(COLOR_ACCENT));
                 String::from("Time limit exceeded")

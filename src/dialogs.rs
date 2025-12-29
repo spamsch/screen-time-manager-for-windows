@@ -884,8 +884,8 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
 
     let screen_width = GetSystemMetrics(SM_CXSCREEN);
     let screen_height = GetSystemMetrics(SM_CYSCREEN);
-    let dialog_width = 400;
-    let dialog_height = 740;
+    let dialog_width = 430;
+    let dialog_height = 770;
 
     let dialog_hwnd = CreateWindowExW(
         WS_EX_TOPMOST | WS_EX_DLGMODALFRAME,
