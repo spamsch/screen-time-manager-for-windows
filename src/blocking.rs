@@ -7,7 +7,7 @@ use std::sync::Mutex;
 use windows::{
     core::w,
     Win32::{
-        Foundation::{BOOL, COLORREF, HWND, LPARAM, LRESULT, RECT, WPARAM},
+        Foundation::{BOOL, COLORREF, HWND, LPARAM, LRESULT, RECT, WPARAM, CloseHandle},
         Graphics::Gdi::{
             BeginPaint, CreateFontW, CreatePen, CreateSolidBrush, DeleteObject, DrawTextW,
             EndPaint, EnumDisplayMonitors, FillRect, InvalidateRect, RoundRect, SelectObject,
@@ -17,6 +17,11 @@ use windows::{
         Media::Audio::{PlaySoundW, SND_ALIAS, SND_ASYNC},
         System::LibraryLoader::GetModuleHandleW,
         System::Shutdown::{ExitWindowsEx, EWX_SHUTDOWN, SHUTDOWN_REASON},
+        System::Threading::{GetCurrentProcess, OpenProcessToken},
+        Security::{
+            AdjustTokenPrivileges, LookupPrivilegeValueW, SE_PRIVILEGE_ENABLED,
+            TOKEN_ADJUST_PRIVILEGES, TOKEN_PRIVILEGES, TOKEN_QUERY,
+        },
         UI::{
             Controls::*,
             Input::KeyboardAndMouse::{SetFocus, VK_RETURN},
@@ -27,6 +32,45 @@ use windows::{
 
 use crate::constants::*;
 use crate::database::get_passcode;
+
+/// Initiates a Windows shutdown with proper privilege handling
+unsafe fn initiate_shutdown() -> bool {
+    // Open the process token
+    let mut token_handle = std::mem::zeroed();
+    if OpenProcessToken(
+        GetCurrentProcess(),
+        TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY,
+        &mut token_handle,
+    ).is_err() {
+        return false;
+    }
+
+    // Look up the shutdown privilege
+    let mut luid = std::mem::zeroed();
+    if LookupPrivilegeValueW(None, w!("SeShutdownPrivilege"), &mut luid).is_err() {
+        let _ = CloseHandle(token_handle);
+        return false;
+    }
+
+    // Enable the privilege
+    let mut tp = TOKEN_PRIVILEGES {
+        PrivilegeCount: 1,
+        Privileges: [windows::Win32::Security::LUID_AND_ATTRIBUTES {
+            Luid: luid,
+            Attributes: SE_PRIVILEGE_ENABLED,
+        }],
+    };
+
+    if AdjustTokenPrivileges(token_handle, false, Some(&mut tp), 0, None, None).is_err() {
+        let _ = CloseHandle(token_handle);
+        return false;
+    }
+
+    let _ = CloseHandle(token_handle);
+
+    // Now perform the shutdown
+    ExitWindowsEx(EWX_SHUTDOWN, SHUTDOWN_REASON(0)).is_ok()
+}
 
 /// Storage for secondary monitor overlay handles (stores raw pointers as isize for Send+Sync)
 static SECONDARY_OVERLAY_HWNDS: Mutex<Vec<isize>> = Mutex::new(Vec::new());
@@ -643,8 +687,8 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                             MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2,
                         );
                         if result == IDYES {
-                            // Initiate system shutdown
-                            let _ = ExitWindowsEx(EWX_SHUTDOWN, SHUTDOWN_REASON(0));
+                            // Initiate system shutdown with proper privilege
+                            initiate_shutdown();
                         }
                     }
                     _ => {}
@@ -668,8 +712,8 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                     if shutdown_remaining > 0 {
                         SHUTDOWN_COUNTDOWN_SECONDS.store(shutdown_remaining - 1, Ordering::SeqCst);
                     } else if shutdown_remaining == 0 {
-                        // Trigger shutdown
-                        let _ = ExitWindowsEx(EWX_SHUTDOWN, SHUTDOWN_REASON(0));
+                        // Trigger shutdown with proper privilege
+                        initiate_shutdown();
                     }
 
                     // Redraw to update time display
