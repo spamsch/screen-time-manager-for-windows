@@ -4,6 +4,8 @@ A simple Windows app to manage your child's computer time. Set daily limits, and
 
 No complicated setup. No special accounts needed. Just run it and configure your limits.
 
+Confirmed to be effectively blocking Fortnite, Roblox and Minecraft.
+
 ---
 
 ## What It Does
