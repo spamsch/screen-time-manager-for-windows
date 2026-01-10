@@ -57,7 +57,24 @@ jobs:
         run: |
           $version = "${{ steps.version.outputs.VERSION }}"
           $archiveName = "screen-time-manager-v$version-windows-x64.zip"
-          Compress-Archive -Path "target/release/screen-time-manager.exe" -DestinationPath $archiveName
+
+          # Create a temporary directory for the release contents
+          $releaseDir = "release-package"
+          New-Item -ItemType Directory -Path $releaseDir -Force | Out-Null
+
+          # Copy executable
+          Copy-Item "target/release/screen-time-manager.exe" -Destination $releaseDir
+
+          # Copy install/uninstall/update scripts
+          Copy-Item "install.ps1" -Destination $releaseDir
+          Copy-Item "install.bat" -Destination $releaseDir
+          Copy-Item "uninstall.ps1" -Destination $releaseDir
+          Copy-Item "uninstall.bat" -Destination $releaseDir
+          Copy-Item "update.ps1" -Destination $releaseDir
+          Copy-Item "update.bat" -Destination $releaseDir
+
+          # Create the archive
+          Compress-Archive -Path "$releaseDir\*" -DestinationPath $archiveName
           echo "ARCHIVE_NAME=$archiveName" >> $env:GITHUB_ENV
 
       - name: Generate release notes
@@ -77,14 +94,23 @@ jobs:
           ### Installation
 
           1. Download ``screen-time-manager-v$version-windows-x64.zip``
-          2. Extract the executable to a folder of your choice
-          3. Run ``screen-time-manager.exe``
+          2. Extract all files to a folder of your choice (e.g., ``C:\Program Files\ScreenTimeManager``)
+          3. Run ``install.bat`` (or ``install.ps1`` in PowerShell)
+          4. The app will start automatically on login
 
-          ### Autostart (Optional)
+          ### Updating
 
-          To start automatically with Windows:
-          1. Press ``Win + R``, type ``shell:startup``, press Enter
-          2. Create a shortcut to ``screen-time-manager.exe`` in this folder
+          1. Download the new version and extract to the same folder
+          2. Run ``update.bat`` (or ``update.ps1`` in PowerShell)
+
+          ### Uninstalling
+
+          1. Run ``uninstall.bat`` (or ``uninstall.ps1`` in PowerShell)
+          2. Optionally delete the folder and ``%APPDATA%\ScreenTimeManager``
+
+          ### Manual Start (No Auto-Start)
+
+          If you prefer not to use auto-start, just run ``screen-time-manager.exe`` directly.
 
           ### Requirements
 
