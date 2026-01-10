@@ -31,6 +31,8 @@ enum Command {
     Time,
     #[command(description = "Extend time by minutes (e.g., /extend 30)")]
     Extend(i32),
+    #[command(description = "Reduce time by minutes (e.g., /reduce 30)")]
+    Reduce(i32),
     #[command(description = "Pause the timer")]
     Pause,
     #[command(description = "Resume the timer")]
@@ -204,6 +206,7 @@ async fn handle_command(
         Command::Status => cmd_status(),
         Command::Time => cmd_time(),
         Command::Extend(mins) => cmd_extend(mins),
+        Command::Reduce(mins) => cmd_reduce(mins),
         Command::Pause => cmd_pause(),
         Command::Resume => cmd_resume(),
         Command::History => cmd_history(),
@@ -285,6 +288,32 @@ fn cmd_extend(minutes: i32) -> String {
     let new_secs = remaining % 60;
 
     format!("✅ Extended by {} minutes\nNew remaining: {}:{:02}", minutes, new_mins, new_secs)
+}
+
+fn cmd_reduce(minutes: i32) -> String {
+    if minutes <= 0 {
+        return "Please specify a positive number of minutes".to_string();
+    }
+    if minutes > 120 {
+        return "Maximum reduction is 120 minutes".to_string();
+    }
+
+    let current = blocking::get_remaining_seconds();
+    let reduction_seconds = minutes * 60;
+
+    if reduction_seconds >= current {
+        return format!("Cannot reduce by {} minutes - only {}:{:02} remaining",
+            minutes, current / 60, current % 60);
+    }
+
+    blocking::reduce_time(minutes);
+
+    // Get new remaining time
+    let remaining = blocking::get_remaining_seconds();
+    let new_mins = remaining / 60;
+    let new_secs = remaining % 60;
+
+    format!("⏬ Reduced by {} minutes\nNew remaining: {}:{:02}", minutes, new_mins, new_secs)
 }
 
 fn cmd_pause() -> String {

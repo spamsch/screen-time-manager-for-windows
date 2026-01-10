@@ -208,6 +208,15 @@ pub fn extend_time(minutes: i32) {
     }
 }
 
+/// Reduce the remaining time by the specified minutes
+pub fn reduce_time(minutes: i32) {
+    let current = REMAINING_SECONDS.load(Ordering::SeqCst);
+    let reduction_seconds = minutes * 60;
+
+    let new_time = (current - reduction_seconds).max(0);
+    REMAINING_SECONDS.store(new_time, Ordering::SeqCst);
+}
+
 /// Format seconds into a human-readable string (e.g., "1h 30m 45s")
 fn format_time(seconds: i32) -> String {
     if seconds < 0 {
