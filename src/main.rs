@@ -9,6 +9,7 @@ mod blocking;
 mod constants;
 mod database;
 mod dialogs;
+mod dpi;
 mod mini_overlay;
 mod overlay;
 mod telegram;
@@ -23,6 +24,7 @@ use windows::{
             LibraryLoader::GetModuleHandleW,
             Threading::CreateMutexW,
         },
+        UI::HiDpi::{SetProcessDpiAwareness, PROCESS_PER_MONITOR_DPI_AWARE},
         UI::WindowsAndMessaging::*,
     },
 };
@@ -37,6 +39,10 @@ use std::sync::atomic::Ordering;
 
 fn main() {
     unsafe {
+        // Set DPI awareness before creating any windows
+        let _ = SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
+        dpi::init_dpi();
+
         // Check for single instance
         if !ensure_single_instance() {
             MessageBoxW(

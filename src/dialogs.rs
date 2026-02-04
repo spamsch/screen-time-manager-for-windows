@@ -22,6 +22,7 @@ use windows::{
 
 use crate::constants::*;
 use crate::database::{get_passcode, get_setting, set_setting, set_telegram_config, get_telegram_config, WEEKDAY_KEYS, WEEKDAY_NAMES, get_pause_used_today, get_pause_config, get_pause_log_today, is_pause_enabled};
+use crate::dpi::scale;
 
 // Control IDs for settings dialog
 const ID_SETTINGS_BASE: i32 = 2000;
@@ -87,7 +88,7 @@ pub unsafe fn verify_passcode_for_quit(parent_hwnd: HWND) -> bool {
                     w!(""),
                     WS_CHILD | WS_VISIBLE | WS_BORDER
                         | WINDOW_STYLE(ES_CENTER as u32 | ES_PASSWORD as u32 | ES_NUMBER as u32),
-                    100, 95, 150, 45,
+                    scale(100), scale(95), scale(150), scale(45),
                     hwnd,
                     HMENU(101 as _),
                     hinstance,
@@ -99,7 +100,7 @@ pub unsafe fn verify_passcode_for_quit(parent_hwnd: HWND) -> bool {
                     SendMessageW(e, EM_SETLIMITTEXT, WPARAM(4), LPARAM(0));
 
                     let hfont = CreateFontW(
-                        28, 0, 0, 0,
+                        scale(28), 0, 0, 0,
                         FW_BOLD.0 as i32,
                         0, 0, 0, 0, 0, 0, 0, 0,
                         w!("Segoe UI"),
@@ -114,7 +115,7 @@ pub unsafe fn verify_passcode_for_quit(parent_hwnd: HWND) -> bool {
                     w!("BUTTON"),
                     w!("OK"),
                     WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_PUSHBUTTON as u32),
-                    70, 200, 100, 40,
+                    scale(70), scale(200), scale(100), scale(40),
                     hwnd,
                     HMENU(1 as _),
                     hinstance,
@@ -127,7 +128,7 @@ pub unsafe fn verify_passcode_for_quit(parent_hwnd: HWND) -> bool {
                     w!("BUTTON"),
                     w!("Cancel"),
                     WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_PUSHBUTTON as u32),
-                    180, 200, 100, 40,
+                    scale(180), scale(200), scale(100), scale(40),
                     hwnd,
                     HMENU(2 as _),
                     hinstance,
@@ -148,7 +149,7 @@ pub unsafe fn verify_passcode_for_quit(parent_hwnd: HWND) -> bool {
                 let _ = DeleteObject(bg_brush);
 
                 let title_font = CreateFontW(
-                    22, 0, 0, 0,
+                    scale(22), 0, 0, 0,
                     FW_BOLD.0 as i32,
                     0, 0, 0, 0, 0, 0, 0, 0,
                     w!("Segoe UI"),
@@ -157,7 +158,7 @@ pub unsafe fn verify_passcode_for_quit(parent_hwnd: HWND) -> bool {
                 SetTextColor(hdc, COLORREF(0x00333333));
                 SetBkMode(hdc, TRANSPARENT);
 
-                let mut title_rect = RECT { left: 0, top: 25, right: rect.right, bottom: 55 };
+                let mut title_rect = RECT { left: 0, top: scale(25), right: rect.right, bottom: scale(55) };
                 DrawTextW(
                     hdc,
                     &mut "Enter Passcode".encode_utf16().collect::<Vec<_>>(),
@@ -166,7 +167,7 @@ pub unsafe fn verify_passcode_for_quit(parent_hwnd: HWND) -> bool {
                 );
 
                 let sub_font = CreateFontW(
-                    14, 0, 0, 0,
+                    scale(14), 0, 0, 0,
                     FW_NORMAL.0 as i32,
                     0, 0, 0, 0, 0, 0, 0, 0,
                     w!("Segoe UI"),
@@ -174,7 +175,7 @@ pub unsafe fn verify_passcode_for_quit(parent_hwnd: HWND) -> bool {
                 SelectObject(hdc, sub_font);
                 SetTextColor(hdc, COLORREF(0x00666666));
 
-                let mut sub_rect = RECT { left: 0, top: 55, right: rect.right, bottom: 80 };
+                let mut sub_rect = RECT { left: 0, top: scale(55), right: rect.right, bottom: scale(80) };
                 DrawTextW(
                     hdc,
                     &mut "Enter 4-digit code to continue".encode_utf16().collect::<Vec<_>>(),
@@ -184,7 +185,7 @@ pub unsafe fn verify_passcode_for_quit(parent_hwnd: HWND) -> bool {
 
                 if DIALOG_ERROR {
                     SetTextColor(hdc, COLORREF(COLOR_ERROR));
-                    let mut err_rect = RECT { left: 0, top: 150, right: rect.right, bottom: 170 };
+                    let mut err_rect = RECT { left: 0, top: scale(150), right: rect.right, bottom: scale(170) };
                     DrawTextW(
                         hdc,
                         &mut "Incorrect passcode".encode_utf16().collect::<Vec<_>>(),
@@ -265,8 +266,8 @@ pub unsafe fn verify_passcode_for_quit(parent_hwnd: HWND) -> bool {
 
     let screen_width = GetSystemMetrics(SM_CXSCREEN);
     let screen_height = GetSystemMetrics(SM_CYSCREEN);
-    let dialog_width = 350;
-    let dialog_height = 300;
+    let dialog_width = scale(350);
+    let dialog_height = scale(300);
 
     let dialog_hwnd = CreateWindowExW(
         WS_EX_TOPMOST | WS_EX_DLGMODALFRAME,
@@ -284,7 +285,7 @@ pub unsafe fn verify_passcode_for_quit(parent_hwnd: HWND) -> bool {
     );
 
     if let Ok(dlg) = dialog_hwnd {
-        let rgn = CreateRoundRectRgn(0, 0, dialog_width, dialog_height, 10, 10);
+        let rgn = CreateRoundRectRgn(0, 0, dialog_width, dialog_height, scale(10), scale(10));
         SetWindowRgn(dlg, rgn, true);
 
         let _ = ShowWindow(dlg, SW_SHOW);
@@ -323,24 +324,24 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                 let hinstance = GetModuleHandleW(None).unwrap();
 
                 let label_font = CreateFontW(
-                    16, 0, 0, 0, FW_NORMAL.0 as i32, 0, 0, 0, 0, 0, 0, 0, 0, w!("Segoe UI"),
+                    scale(16), 0, 0, 0, FW_NORMAL.0 as i32, 0, 0, 0, 0, 0, 0, 0, 0, w!("Segoe UI"),
                 );
                 let title_font = CreateFontW(
-                    18, 0, 0, 0, FW_BOLD.0 as i32, 0, 0, 0, 0, 0, 0, 0, 0, w!("Segoe UI"),
+                    scale(18), 0, 0, 0, FW_BOLD.0 as i32, 0, 0, 0, 0, 0, 0, 0, 0, w!("Segoe UI"),
                 );
                 let edit_font = CreateFontW(
-                    16, 0, 0, 0, FW_NORMAL.0 as i32, 0, 0, 0, 0, 0, 0, 0, 0, w!("Segoe UI"),
+                    scale(16), 0, 0, 0, FW_NORMAL.0 as i32, 0, 0, 0, 0, 0, 0, 0, 0, w!("Segoe UI"),
                 );
 
-                let mut y_pos = 15;
+                let mut y_pos = scale(10);
 
                 // ===== Daily Limits Section =====
                 let title1 = CreateWindowExW(
                     WINDOW_EX_STYLE(0), w!("STATIC"), w!("Daily Time Limits (minutes)"),
-                    WS_CHILD | WS_VISIBLE, 15, y_pos, 350, 20, hwnd, HMENU::default(), hinstance, None,
+                    WS_CHILD | WS_VISIBLE, scale(15), y_pos, scale(350), scale(20), hwnd, HMENU::default(), hinstance, None,
                 );
                 if let Ok(h) = title1 { SendMessageW(h, WM_SETFONT, WPARAM(title_font.0 as usize), LPARAM(1)); }
-                y_pos += 28;
+                y_pos += scale(22);
 
                 let mut daily_handles: [HWND; 7] = [HWND::default(); 7];
 
@@ -356,14 +357,14 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                     let label_text: Vec<u16> = format!("{}:\0", WEEKDAY_NAMES[i]).encode_utf16().collect();
                     let label = CreateWindowExW(
                         WINDOW_EX_STYLE(0), w!("STATIC"), PCWSTR(label_text.as_ptr()),
-                        WS_CHILD | WS_VISIBLE, 25, y_pos + 2, 90, 20, hwnd, HMENU::default(), hinstance, None,
+                        WS_CHILD | WS_VISIBLE, scale(25), y_pos + scale(2), scale(90), scale(20), hwnd, HMENU::default(), hinstance, None,
                     );
                     if let Ok(h) = label { SendMessageW(h, WM_SETFONT, WPARAM(label_font.0 as usize), LPARAM(1)); }
 
                     let edit = CreateWindowExW(
                         WINDOW_EX_STYLE(0x200), w!("EDIT"), w!(""),
                         WS_CHILD | WS_VISIBLE | WS_BORDER | WINDOW_STYLE(ES_NUMBER as u32 | ES_CENTER as u32),
-                        120, y_pos, 60, 24, hwnd, HMENU((ID_SETTINGS_BASE + i as i32) as _), hinstance, None,
+                        scale(120), y_pos, scale(60), scale(22), hwnd, HMENU((ID_SETTINGS_BASE + i as i32) as _), hinstance, None,
                     );
                     if let Ok(h) = edit {
                         SendMessageW(h, WM_SETFONT, WPARAM(edit_font.0 as usize), LPARAM(1));
@@ -380,14 +381,14 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                         let label_text2: Vec<u16> = format!("{}:\0", WEEKDAY_NAMES[i2]).encode_utf16().collect();
                         let label2 = CreateWindowExW(
                             WINDOW_EX_STYLE(0), w!("STATIC"), PCWSTR(label_text2.as_ptr()),
-                            WS_CHILD | WS_VISIBLE, 210, y_pos + 2, 90, 20, hwnd, HMENU::default(), hinstance, None,
+                            WS_CHILD | WS_VISIBLE, scale(210), y_pos + scale(2), scale(90), scale(20), hwnd, HMENU::default(), hinstance, None,
                         );
                         if let Ok(h) = label2 { SendMessageW(h, WM_SETFONT, WPARAM(label_font.0 as usize), LPARAM(1)); }
 
                         let edit2 = CreateWindowExW(
                             WINDOW_EX_STYLE(0x200), w!("EDIT"), w!(""),
                             WS_CHILD | WS_VISIBLE | WS_BORDER | WINDOW_STYLE(ES_NUMBER as u32 | ES_CENTER as u32),
-                            305, y_pos, 60, 24, hwnd, HMENU((ID_SETTINGS_BASE + i2 as i32) as _), hinstance, None,
+                            scale(305), y_pos, scale(60), scale(22), hwnd, HMENU((ID_SETTINGS_BASE + i2 as i32) as _), hinstance, None,
                         );
                         if let Ok(h) = edit2 {
                             SendMessageW(h, WM_SETFONT, WPARAM(edit_font.0 as usize), LPARAM(1));
@@ -399,27 +400,26 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                         }
                     }
 
-                    y_pos += 30;
+                    y_pos += scale(24);
                 }
-                y_pos += 5;
 
                 // ===== Warning 1 Section =====
-                y_pos += 10;
+                y_pos += scale(4);
                 let title2 = CreateWindowExW(
                     WINDOW_EX_STYLE(0), w!("STATIC"), w!("First Warning"),
-                    WS_CHILD | WS_VISIBLE, 15, y_pos, 350, 20, hwnd, HMENU::default(), hinstance, None,
+                    WS_CHILD | WS_VISIBLE, scale(15), y_pos, scale(350), scale(20), hwnd, HMENU::default(), hinstance, None,
                 );
                 if let Ok(h) = title2 { SendMessageW(h, WM_SETFONT, WPARAM(title_font.0 as usize), LPARAM(1)); }
-                y_pos += 25;
+                y_pos += scale(20);
 
                 let _ = CreateWindowExW(
                     WINDOW_EX_STYLE(0), w!("STATIC"), w!("Minutes before:"),
-                    WS_CHILD | WS_VISIBLE, 25, y_pos + 2, 100, 20, hwnd, HMENU::default(), hinstance, None,
+                    WS_CHILD | WS_VISIBLE, scale(25), y_pos + scale(2), scale(100), scale(20), hwnd, HMENU::default(), hinstance, None,
                 );
                 let w1_min = CreateWindowExW(
                     WINDOW_EX_STYLE(0x200), w!("EDIT"), w!(""),
                     WS_CHILD | WS_VISIBLE | WS_BORDER | WINDOW_STYLE(ES_NUMBER as u32 | ES_CENTER as u32),
-                    130, y_pos, 50, 24, hwnd, HMENU((ID_SETTINGS_BASE + 20) as _), hinstance, None,
+                    scale(130), y_pos, scale(50), scale(22), hwnd, HMENU((ID_SETTINGS_BASE + 20) as _), hinstance, None,
                 );
                 let mut w1_min_hwnd = HWND::default();
                 if let Ok(h) = w1_min {
@@ -429,16 +429,16 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                     SetWindowTextW(h, PCWSTR(wide.as_ptr())).ok();
                     w1_min_hwnd = h;
                 }
-                y_pos += 28;
+                y_pos += scale(24);
 
                 let _ = CreateWindowExW(
                     WINDOW_EX_STYLE(0), w!("STATIC"), w!("Message:"),
-                    WS_CHILD | WS_VISIBLE, 25, y_pos + 2, 60, 20, hwnd, HMENU::default(), hinstance, None,
+                    WS_CHILD | WS_VISIBLE, scale(25), y_pos + scale(2), scale(60), scale(20), hwnd, HMENU::default(), hinstance, None,
                 );
                 let w1_msg = CreateWindowExW(
                     WINDOW_EX_STYLE(0x200), w!("EDIT"), w!(""),
                     WS_CHILD | WS_VISIBLE | WS_BORDER,
-                    90, y_pos, 275, 24, hwnd, HMENU((ID_SETTINGS_BASE + 21) as _), hinstance, None,
+                    scale(90), y_pos, scale(275), scale(22), hwnd, HMENU((ID_SETTINGS_BASE + 21) as _), hinstance, None,
                 );
                 let mut w1_msg_hwnd = HWND::default();
                 if let Ok(h) = w1_msg {
@@ -448,24 +448,24 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                     SetWindowTextW(h, PCWSTR(wide.as_ptr())).ok();
                     w1_msg_hwnd = h;
                 }
-                y_pos += 32;
+                y_pos += scale(24);
 
                 // ===== Warning 2 Section =====
                 let title3 = CreateWindowExW(
                     WINDOW_EX_STYLE(0), w!("STATIC"), w!("Second Warning"),
-                    WS_CHILD | WS_VISIBLE, 15, y_pos, 350, 20, hwnd, HMENU::default(), hinstance, None,
+                    WS_CHILD | WS_VISIBLE, scale(15), y_pos, scale(350), scale(20), hwnd, HMENU::default(), hinstance, None,
                 );
                 if let Ok(h) = title3 { SendMessageW(h, WM_SETFONT, WPARAM(title_font.0 as usize), LPARAM(1)); }
-                y_pos += 25;
+                y_pos += scale(20);
 
                 let _ = CreateWindowExW(
                     WINDOW_EX_STYLE(0), w!("STATIC"), w!("Minutes before:"),
-                    WS_CHILD | WS_VISIBLE, 25, y_pos + 2, 100, 20, hwnd, HMENU::default(), hinstance, None,
+                    WS_CHILD | WS_VISIBLE, scale(25), y_pos + scale(2), scale(100), scale(20), hwnd, HMENU::default(), hinstance, None,
                 );
                 let w2_min = CreateWindowExW(
                     WINDOW_EX_STYLE(0x200), w!("EDIT"), w!(""),
                     WS_CHILD | WS_VISIBLE | WS_BORDER | WINDOW_STYLE(ES_NUMBER as u32 | ES_CENTER as u32),
-                    130, y_pos, 50, 24, hwnd, HMENU((ID_SETTINGS_BASE + 30) as _), hinstance, None,
+                    scale(130), y_pos, scale(50), scale(22), hwnd, HMENU((ID_SETTINGS_BASE + 30) as _), hinstance, None,
                 );
                 let mut w2_min_hwnd = HWND::default();
                 if let Ok(h) = w2_min {
@@ -475,16 +475,16 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                     SetWindowTextW(h, PCWSTR(wide.as_ptr())).ok();
                     w2_min_hwnd = h;
                 }
-                y_pos += 28;
+                y_pos += scale(24);
 
                 let _ = CreateWindowExW(
                     WINDOW_EX_STYLE(0), w!("STATIC"), w!("Message:"),
-                    WS_CHILD | WS_VISIBLE, 25, y_pos + 2, 60, 20, hwnd, HMENU::default(), hinstance, None,
+                    WS_CHILD | WS_VISIBLE, scale(25), y_pos + scale(2), scale(60), scale(20), hwnd, HMENU::default(), hinstance, None,
                 );
                 let w2_msg = CreateWindowExW(
                     WINDOW_EX_STYLE(0x200), w!("EDIT"), w!(""),
                     WS_CHILD | WS_VISIBLE | WS_BORDER,
-                    90, y_pos, 275, 24, hwnd, HMENU((ID_SETTINGS_BASE + 31) as _), hinstance, None,
+                    scale(90), y_pos, scale(275), scale(22), hwnd, HMENU((ID_SETTINGS_BASE + 31) as _), hinstance, None,
                 );
                 let mut w2_msg_hwnd = HWND::default();
                 if let Ok(h) = w2_msg {
@@ -494,20 +494,20 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                     SetWindowTextW(h, PCWSTR(wide.as_ptr())).ok();
                     w2_msg_hwnd = h;
                 }
-                y_pos += 32;
+                y_pos += scale(24);
 
                 // ===== Blocking Message Section =====
                 let title4 = CreateWindowExW(
                     WINDOW_EX_STYLE(0), w!("STATIC"), w!("Blocking Screen Message"),
-                    WS_CHILD | WS_VISIBLE, 15, y_pos, 350, 20, hwnd, HMENU::default(), hinstance, None,
+                    WS_CHILD | WS_VISIBLE, scale(15), y_pos, scale(350), scale(20), hwnd, HMENU::default(), hinstance, None,
                 );
                 if let Ok(h) = title4 { SendMessageW(h, WM_SETFONT, WPARAM(title_font.0 as usize), LPARAM(1)); }
-                y_pos += 25;
+                y_pos += scale(20);
 
                 let block_msg = CreateWindowExW(
                     WINDOW_EX_STYLE(0x200), w!("EDIT"), w!(""),
                     WS_CHILD | WS_VISIBLE | WS_BORDER,
-                    25, y_pos, 340, 24, hwnd, HMENU((ID_SETTINGS_BASE + 40) as _), hinstance, None,
+                    scale(25), y_pos, scale(340), scale(22), hwnd, HMENU((ID_SETTINGS_BASE + 40) as _), hinstance, None,
                 );
                 let mut block_msg_hwnd = HWND::default();
                 if let Ok(h) = block_msg {
@@ -517,24 +517,24 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                     SetWindowTextW(h, PCWSTR(wide.as_ptr())).ok();
                     block_msg_hwnd = h;
                 }
-                y_pos += 35;
+                y_pos += scale(24);
 
                 // ===== Change Passcode Section =====
                 let title5 = CreateWindowExW(
-                    WINDOW_EX_STYLE(0), w!("STATIC"), w!("Change Passcode (leave blank to keep current)"),
-                    WS_CHILD | WS_VISIBLE, 15, y_pos, 360, 20, hwnd, HMENU::default(), hinstance, None,
+                    WINDOW_EX_STYLE(0), w!("STATIC"), w!("Change Passcode (leave blank to keep)"),
+                    WS_CHILD | WS_VISIBLE, scale(15), y_pos, scale(360), scale(20), hwnd, HMENU::default(), hinstance, None,
                 );
                 if let Ok(h) = title5 { SendMessageW(h, WM_SETFONT, WPARAM(title_font.0 as usize), LPARAM(1)); }
-                y_pos += 25;
+                y_pos += scale(20);
 
                 let _ = CreateWindowExW(
                     WINDOW_EX_STYLE(0), w!("STATIC"), w!("Current:"),
-                    WS_CHILD | WS_VISIBLE, 25, y_pos + 2, 80, 20, hwnd, HMENU::default(), hinstance, None,
+                    WS_CHILD | WS_VISIBLE, scale(25), y_pos + scale(2), scale(55), scale(20), hwnd, HMENU::default(), hinstance, None,
                 );
                 let curr_pass = CreateWindowExW(
                     WINDOW_EX_STYLE(0x200), w!("EDIT"), w!(""),
                     WS_CHILD | WS_VISIBLE | WS_BORDER | WINDOW_STYLE(ES_PASSWORD as u32 | ES_NUMBER as u32 | ES_CENTER as u32),
-                    110, y_pos, 80, 24, hwnd, HMENU(ID_CURRENT_PASSCODE as _), hinstance, None,
+                    scale(80), y_pos, scale(60), scale(22), hwnd, HMENU(ID_CURRENT_PASSCODE as _), hinstance, None,
                 );
                 let mut curr_pass_hwnd = HWND::default();
                 if let Ok(h) = curr_pass {
@@ -545,12 +545,12 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
 
                 let _ = CreateWindowExW(
                     WINDOW_EX_STYLE(0), w!("STATIC"), w!("New:"),
-                    WS_CHILD | WS_VISIBLE, 210, y_pos + 2, 50, 20, hwnd, HMENU::default(), hinstance, None,
+                    WS_CHILD | WS_VISIBLE, scale(155), y_pos + scale(2), scale(35), scale(20), hwnd, HMENU::default(), hinstance, None,
                 );
                 let new_pass = CreateWindowExW(
                     WINDOW_EX_STYLE(0x200), w!("EDIT"), w!(""),
                     WS_CHILD | WS_VISIBLE | WS_BORDER | WINDOW_STYLE(ES_PASSWORD as u32 | ES_NUMBER as u32 | ES_CENTER as u32),
-                    260, y_pos, 80, 24, hwnd, HMENU(ID_NEW_PASSCODE as _), hinstance, None,
+                    scale(190), y_pos, scale(60), scale(22), hwnd, HMENU(ID_NEW_PASSCODE as _), hinstance, None,
                 );
                 let mut new_pass_hwnd = HWND::default();
                 if let Ok(h) = new_pass {
@@ -558,16 +558,15 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                     SendMessageW(h, EM_SETLIMITTEXT, WPARAM(4), LPARAM(0));
                     new_pass_hwnd = h;
                 }
-                y_pos += 28;
 
                 let _ = CreateWindowExW(
-                    WINDOW_EX_STYLE(0), w!("STATIC"), w!("Confirm new:"),
-                    WS_CHILD | WS_VISIBLE, 25, y_pos + 2, 80, 20, hwnd, HMENU::default(), hinstance, None,
+                    WINDOW_EX_STYLE(0), w!("STATIC"), w!("Confirm:"),
+                    WS_CHILD | WS_VISIBLE, scale(265), y_pos + scale(2), scale(50), scale(20), hwnd, HMENU::default(), hinstance, None,
                 );
                 let confirm_pass = CreateWindowExW(
                     WINDOW_EX_STYLE(0x200), w!("EDIT"), w!(""),
                     WS_CHILD | WS_VISIBLE | WS_BORDER | WINDOW_STYLE(ES_PASSWORD as u32 | ES_NUMBER as u32 | ES_CENTER as u32),
-                    110, y_pos, 80, 24, hwnd, HMENU(ID_CONFIRM_PASSCODE as _), hinstance, None,
+                    scale(315), y_pos, scale(60), scale(22), hwnd, HMENU(ID_CONFIRM_PASSCODE as _), hinstance, None,
                 );
                 let mut confirm_pass_hwnd = HWND::default();
                 if let Ok(h) = confirm_pass {
@@ -575,21 +574,21 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                     SendMessageW(h, EM_SETLIMITTEXT, WPARAM(4), LPARAM(0));
                     confirm_pass_hwnd = h;
                 }
-                y_pos += 35;
+                y_pos += scale(24);
 
                 // ===== Telegram Bot Section =====
                 let title6 = CreateWindowExW(
                     WINDOW_EX_STYLE(0), w!("STATIC"), w!("Telegram Bot"),
-                    WS_CHILD | WS_VISIBLE, 15, y_pos, 360, 20, hwnd, HMENU::default(), hinstance, None,
+                    WS_CHILD | WS_VISIBLE, scale(15), y_pos, scale(360), scale(20), hwnd, HMENU::default(), hinstance, None,
                 );
                 if let Ok(h) = title6 { SendMessageW(h, WM_SETFONT, WPARAM(title_font.0 as usize), LPARAM(1)); }
-                y_pos += 25;
+                y_pos += scale(20);
 
                 // Enable checkbox
                 let telegram_enabled_chk = CreateWindowExW(
                     WINDOW_EX_STYLE(0), w!("BUTTON"), w!("Enable Telegram Bot"),
                     WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                    25, y_pos, 200, 20, hwnd, HMENU::default(), hinstance, None,
+                    scale(25), y_pos, scale(200), scale(20), hwnd, HMENU::default(), hinstance, None,
                 );
                 let mut telegram_enabled_hwnd = HWND::default();
                 if let Ok(h) = telegram_enabled_chk {
@@ -600,17 +599,17 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                     }
                     telegram_enabled_hwnd = h;
                 }
-                y_pos += 25;
+                y_pos += scale(22);
 
                 // Bot Token
                 let _ = CreateWindowExW(
                     WINDOW_EX_STYLE(0), w!("STATIC"), w!("Bot Token:"),
-                    WS_CHILD | WS_VISIBLE, 25, y_pos + 2, 70, 20, hwnd, HMENU::default(), hinstance, None,
+                    WS_CHILD | WS_VISIBLE, scale(25), y_pos + scale(2), scale(70), scale(20), hwnd, HMENU::default(), hinstance, None,
                 );
                 let telegram_token = CreateWindowExW(
                     WINDOW_EX_STYLE(0x200), w!("EDIT"), w!(""),
                     WS_CHILD | WS_VISIBLE | WS_BORDER | WINDOW_STYLE(ES_PASSWORD as u32 | ES_AUTOHSCROLL as u32),
-                    100, y_pos, 265, 24, hwnd, HMENU::default(), hinstance, None,
+                    scale(100), y_pos, scale(265), scale(22), hwnd, HMENU::default(), hinstance, None,
                 );
                 let mut telegram_token_hwnd = HWND::default();
                 if let Ok(h) = telegram_token {
@@ -624,17 +623,17 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                     }
                     telegram_token_hwnd = h;
                 }
-                y_pos += 28;
+                y_pos += scale(24);
 
                 // Admin Chat ID
                 let _ = CreateWindowExW(
                     WINDOW_EX_STYLE(0), w!("STATIC"), w!("Chat ID:"),
-                    WS_CHILD | WS_VISIBLE, 25, y_pos + 2, 70, 20, hwnd, HMENU::default(), hinstance, None,
+                    WS_CHILD | WS_VISIBLE, scale(25), y_pos + scale(2), scale(70), scale(20), hwnd, HMENU::default(), hinstance, None,
                 );
                 let telegram_chat_id = CreateWindowExW(
                     WINDOW_EX_STYLE(0x200), w!("EDIT"), w!(""),
                     WS_CHILD | WS_VISIBLE | WS_BORDER | WINDOW_STYLE(ES_NUMBER as u32),
-                    100, y_pos, 120, 24, hwnd, HMENU::default(), hinstance, None,
+                    scale(100), y_pos, scale(120), scale(22), hwnd, HMENU::default(), hinstance, None,
                 );
                 let mut telegram_chat_id_hwnd = HWND::default();
                 if let Ok(h) = telegram_chat_id {
@@ -647,25 +646,25 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                     }
                     telegram_chat_id_hwnd = h;
                 }
-                y_pos += 35;
+                y_pos += scale(24);
 
                 // ===== Lock Screen Timeout =====
                 let title7 = CreateWindowExW(
                     WINDOW_EX_STYLE(0), w!("STATIC"), w!("Lock Screen"),
-                    WS_CHILD | WS_VISIBLE, 15, y_pos, 360, 20, hwnd, HMENU::default(), hinstance, None,
+                    WS_CHILD | WS_VISIBLE, scale(15), y_pos, scale(360), scale(20), hwnd, HMENU::default(), hinstance, None,
                 );
                 if let Ok(h) = title7 { SendMessageW(h, WM_SETFONT, WPARAM(title_font.0 as usize), LPARAM(1)); }
-                y_pos += 25;
+                y_pos += scale(20);
 
                 // Lock screen timeout input
                 let _ = CreateWindowExW(
-                    WINDOW_EX_STYLE(0), w!("STATIC"), w!("Shutdown timeout (minutes):"),
-                    WS_CHILD | WS_VISIBLE, 25, y_pos + 2, 170, 20, hwnd, HMENU::default(), hinstance, None,
+                    WINDOW_EX_STYLE(0), w!("STATIC"), w!("Shutdown timeout:"),
+                    WS_CHILD | WS_VISIBLE, scale(25), y_pos + scale(2), scale(150), scale(20), hwnd, HMENU::default(), hinstance, None,
                 );
                 let lock_timeout_edit = CreateWindowExW(
                     WINDOW_EX_STYLE(0x200), w!("EDIT"), w!(""),
                     WS_CHILD | WS_VISIBLE | WS_BORDER | WINDOW_STYLE(ES_NUMBER as u32),
-                    200, y_pos, 60, 24, hwnd, HMENU::default(), hinstance, None,
+                    scale(180), y_pos, scale(60), scale(22), hwnd, HMENU::default(), hinstance, None,
                 );
                 let mut lock_timeout_hwnd = HWND::default();
                 if let Ok(h) = lock_timeout_edit {
@@ -678,24 +677,24 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                     SetWindowTextW(h, PCWSTR(wide.as_ptr())).ok();
                     lock_timeout_hwnd = h;
                 }
-                y_pos += 35;
+                y_pos += scale(28);
 
                 // ===== Buttons =====
                 let btn_font = CreateFontW(
-                    16, 0, 0, 0, FW_NORMAL.0 as i32, 0, 0, 0, 0, 0, 0, 0, 0, w!("Segoe UI"),
+                    scale(16), 0, 0, 0, FW_NORMAL.0 as i32, 0, 0, 0, 0, 0, 0, 0, 0, w!("Segoe UI"),
                 );
 
                 let save_btn = CreateWindowExW(
                     WINDOW_EX_STYLE(0), w!("BUTTON"), w!("Save"),
                     WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_PUSHBUTTON as u32),
-                    100, y_pos, 90, 32, hwnd, HMENU(ID_SETTINGS_SAVE as _), hinstance, None,
+                    scale(100), y_pos, scale(90), scale(30), hwnd, HMENU(ID_SETTINGS_SAVE as _), hinstance, None,
                 );
                 if let Ok(h) = save_btn { SendMessageW(h, WM_SETFONT, WPARAM(btn_font.0 as usize), LPARAM(1)); }
 
                 let cancel_btn = CreateWindowExW(
                     WINDOW_EX_STYLE(0), w!("BUTTON"), w!("Cancel"),
                     WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_PUSHBUTTON as u32),
-                    200, y_pos, 90, 32, hwnd, HMENU(ID_SETTINGS_CANCEL as _), hinstance, None,
+                    scale(200), y_pos, scale(90), scale(30), hwnd, HMENU(ID_SETTINGS_CANCEL as _), hinstance, None,
                 );
                 if let Ok(h) = cancel_btn { SendMessageW(h, WM_SETFONT, WPARAM(btn_font.0 as usize), LPARAM(1)); }
 
@@ -884,8 +883,8 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
 
     let screen_width = GetSystemMetrics(SM_CXSCREEN);
     let screen_height = GetSystemMetrics(SM_CYSCREEN);
-    let dialog_width = 430;
-    let dialog_height = 770;
+    let dialog_width = scale(400);
+    let dialog_height = scale(580);
 
     let dialog_hwnd = CreateWindowExW(
         WS_EX_TOPMOST | WS_EX_DLGMODALFRAME,
@@ -903,7 +902,7 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
     );
 
     if let Ok(dlg) = dialog_hwnd {
-        let rgn = CreateRoundRectRgn(0, 0, dialog_width, dialog_height, 10, 10);
+        let rgn = CreateRoundRectRgn(0, 0, dialog_width, dialog_height, scale(10), scale(10));
         SetWindowRgn(dlg, rgn, true);
 
         let _ = ShowWindow(dlg, SW_SHOW);
@@ -950,14 +949,14 @@ pub unsafe fn show_stats_dialog(parent_hwnd: HWND) {
                 let hinstance = GetModuleHandleW(None).unwrap();
 
                 let btn_font = CreateFontW(
-                    16, 0, 0, 0, FW_NORMAL.0 as i32, 0, 0, 0, 0, 0, 0, 0, 0, w!("Segoe UI"),
+                    scale(16), 0, 0, 0, FW_NORMAL.0 as i32, 0, 0, 0, 0, 0, 0, 0, 0, w!("Segoe UI"),
                 );
 
                 // Reset Timer button
                 let reset_btn = CreateWindowExW(
                     WINDOW_EX_STYLE(0), w!("BUTTON"), w!("Reset Timer"),
                     WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_PUSHBUTTON as u32),
-                    50, 310, 120, 35, hwnd, HMENU(ID_RESET_TIMER as _), hinstance, None,
+                    scale(50), scale(310), scale(120), scale(35), hwnd, HMENU(ID_RESET_TIMER as _), hinstance, None,
                 );
                 if let Ok(h) = reset_btn { SendMessageW(h, WM_SETFONT, WPARAM(btn_font.0 as usize), LPARAM(1)); }
 
@@ -965,7 +964,7 @@ pub unsafe fn show_stats_dialog(parent_hwnd: HWND) {
                 let close_btn = CreateWindowExW(
                     WINDOW_EX_STYLE(0), w!("BUTTON"), w!("Close"),
                     WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_PUSHBUTTON as u32),
-                    190, 310, 100, 35, hwnd, HMENU(ID_CLOSE as _), hinstance, None,
+                    scale(190), scale(310), scale(100), scale(35), hwnd, HMENU(ID_CLOSE as _), hinstance, None,
                 );
                 if let Ok(h) = close_btn { SendMessageW(h, WM_SETFONT, WPARAM(btn_font.0 as usize), LPARAM(1)); }
 
@@ -1022,21 +1021,21 @@ pub unsafe fn show_stats_dialog(parent_hwnd: HWND) {
                 let weekday_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
                 let weekday_name = weekday_names.get(weekday as usize).unwrap_or(&"Unknown");
 
-                // Title font
+                // Title font (DPI scaled)
                 let title_font = CreateFontW(
-                    22, 0, 0, 0, FW_BOLD.0 as i32, 0, 0, 0, 0, 0, 0, 0, 0, w!("Segoe UI"),
+                    scale(22), 0, 0, 0, FW_BOLD.0 as i32, 0, 0, 0, 0, 0, 0, 0, 0, w!("Segoe UI"),
                 );
                 let section_font = CreateFontW(
-                    16, 0, 0, 0, FW_BOLD.0 as i32, 0, 0, 0, 0, 0, 0, 0, 0, w!("Segoe UI"),
+                    scale(16), 0, 0, 0, FW_BOLD.0 as i32, 0, 0, 0, 0, 0, 0, 0, 0, w!("Segoe UI"),
                 );
                 let label_font = CreateFontW(
-                    15, 0, 0, 0, FW_NORMAL.0 as i32, 0, 0, 0, 0, 0, 0, 0, 0, w!("Segoe UI"),
+                    scale(15), 0, 0, 0, FW_NORMAL.0 as i32, 0, 0, 0, 0, 0, 0, 0, 0, w!("Segoe UI"),
                 );
                 let value_font = CreateFontW(
-                    16, 0, 0, 0, FW_BOLD.0 as i32, 0, 0, 0, 0, 0, 0, 0, 0, w!("Segoe UI"),
+                    scale(16), 0, 0, 0, FW_BOLD.0 as i32, 0, 0, 0, 0, 0, 0, 0, 0, w!("Segoe UI"),
                 );
                 let small_font = CreateFontW(
-                    13, 0, 0, 0, FW_NORMAL.0 as i32, 0, 0, 0, 0, 0, 0, 0, 0, w!("Segoe UI"),
+                    scale(13), 0, 0, 0, FW_NORMAL.0 as i32, 0, 0, 0, 0, 0, 0, 0, 0, w!("Segoe UI"),
                 );
 
                 let old_font = SelectObject(hdc, title_font);
@@ -1044,7 +1043,7 @@ pub unsafe fn show_stats_dialog(parent_hwnd: HWND) {
                 SetBkMode(hdc, TRANSPARENT);
 
                 // Title
-                let mut title_rect = RECT { left: 0, top: 15, right: rect.right, bottom: 42 };
+                let mut title_rect = RECT { left: 0, top: scale(15), right: rect.right, bottom: scale(42) };
                 DrawTextW(
                     hdc,
                     &mut "Today's Statistics".encode_utf16().collect::<Vec<_>>(),
@@ -1053,53 +1052,53 @@ pub unsafe fn show_stats_dialog(parent_hwnd: HWND) {
                 );
 
                 // Stats
-                let mut y = 50;
-                let left_margin = 25;
-                let value_x = 160;
+                let mut y = scale(50);
+                let left_margin = scale(25);
+                let value_x = scale(160);
 
                 // Day
                 SelectObject(hdc, label_font);
                 SetTextColor(hdc, COLORREF(0x00666666));
-                let mut label_rect = RECT { left: left_margin, top: y, right: value_x, bottom: y + 22 };
+                let mut label_rect = RECT { left: left_margin, top: y, right: value_x, bottom: y + scale(22) };
                 DrawTextW(hdc, &mut "Day:".encode_utf16().collect::<Vec<_>>(), &mut label_rect, DT_SINGLELINE);
 
                 SelectObject(hdc, value_font);
                 SetTextColor(hdc, COLORREF(0x00333333));
                 let day_str = format!("{}", weekday_name);
-                let mut value_rect = RECT { left: value_x, top: y, right: rect.right - 15, bottom: y + 22 };
+                let mut value_rect = RECT { left: value_x, top: y, right: rect.right - scale(15), bottom: y + scale(22) };
                 DrawTextW(hdc, &mut day_str.encode_utf16().collect::<Vec<_>>(), &mut value_rect, DT_SINGLELINE);
-                y += 24;
+                y += scale(24);
 
                 // Daily limit
                 SelectObject(hdc, label_font);
                 SetTextColor(hdc, COLORREF(0x00666666));
-                let mut label_rect = RECT { left: left_margin, top: y, right: value_x, bottom: y + 22 };
+                let mut label_rect = RECT { left: left_margin, top: y, right: value_x, bottom: y + scale(22) };
                 DrawTextW(hdc, &mut "Daily Limit:".encode_utf16().collect::<Vec<_>>(), &mut label_rect, DT_SINGLELINE);
 
                 SelectObject(hdc, value_font);
                 SetTextColor(hdc, COLORREF(0x00333333));
                 let limit_str = format!("{} min", daily_limit_minutes);
-                let mut value_rect = RECT { left: value_x, top: y, right: rect.right - 15, bottom: y + 22 };
+                let mut value_rect = RECT { left: value_x, top: y, right: rect.right - scale(15), bottom: y + scale(22) };
                 DrawTextW(hdc, &mut limit_str.encode_utf16().collect::<Vec<_>>(), &mut value_rect, DT_SINGLELINE);
-                y += 24;
+                y += scale(24);
 
                 // Time used
                 SelectObject(hdc, label_font);
                 SetTextColor(hdc, COLORREF(0x00666666));
-                let mut label_rect = RECT { left: left_margin, top: y, right: value_x, bottom: y + 22 };
+                let mut label_rect = RECT { left: left_margin, top: y, right: value_x, bottom: y + scale(22) };
                 DrawTextW(hdc, &mut "Time Used:".encode_utf16().collect::<Vec<_>>(), &mut label_rect, DT_SINGLELINE);
 
                 SelectObject(hdc, value_font);
                 SetTextColor(hdc, COLORREF(0x00333333));
                 let used_str = format_duration(used_seconds.max(0));
-                let mut value_rect = RECT { left: value_x, top: y, right: rect.right - 15, bottom: y + 22 };
+                let mut value_rect = RECT { left: value_x, top: y, right: rect.right - scale(15), bottom: y + scale(22) };
                 DrawTextW(hdc, &mut used_str.encode_utf16().collect::<Vec<_>>(), &mut value_rect, DT_SINGLELINE);
-                y += 24;
+                y += scale(24);
 
                 // Time remaining
                 SelectObject(hdc, label_font);
                 SetTextColor(hdc, COLORREF(0x00666666));
-                let mut label_rect = RECT { left: left_margin, top: y, right: value_x, bottom: y + 22 };
+                let mut label_rect = RECT { left: left_margin, top: y, right: value_x, bottom: y + scale(22) };
                 DrawTextW(hdc, &mut "Time Remaining:".encode_utf16().collect::<Vec<_>>(), &mut label_rect, DT_SINGLELINE);
 
                 SelectObject(hdc, value_font);
@@ -1112,35 +1111,35 @@ pub unsafe fn show_stats_dialog(parent_hwnd: HWND) {
                     SetTextColor(hdc, COLORREF(0x00008800)); // Green
                 }
                 let remaining_str = format_duration(remaining_seconds);
-                let mut value_rect = RECT { left: value_x, top: y, right: rect.right - 15, bottom: y + 22 };
+                let mut value_rect = RECT { left: value_x, top: y, right: rect.right - scale(15), bottom: y + scale(22) };
                 DrawTextW(hdc, &mut remaining_str.encode_utf16().collect::<Vec<_>>(), &mut value_rect, DT_SINGLELINE);
-                y += 32;
+                y += scale(32);
 
                 // ===== Pause Section =====
                 SelectObject(hdc, section_font);
                 SetTextColor(hdc, COLORREF(0x00333333));
-                let mut section_rect = RECT { left: left_margin, top: y, right: rect.right - 15, bottom: y + 20 };
+                let mut section_rect = RECT { left: left_margin, top: y, right: rect.right - scale(15), bottom: y + scale(20) };
                 DrawTextW(hdc, &mut "Pause Mode".encode_utf16().collect::<Vec<_>>(), &mut section_rect, DT_SINGLELINE);
-                y += 22;
+                y += scale(22);
 
                 if pause_enabled {
                     // Pause budget used
                     SelectObject(hdc, label_font);
                     SetTextColor(hdc, COLORREF(0x00666666));
-                    let mut label_rect = RECT { left: left_margin, top: y, right: value_x, bottom: y + 22 };
+                    let mut label_rect = RECT { left: left_margin, top: y, right: value_x, bottom: y + scale(22) };
                     DrawTextW(hdc, &mut "Pause Used:".encode_utf16().collect::<Vec<_>>(), &mut label_rect, DT_SINGLELINE);
 
                     SelectObject(hdc, value_font);
                     SetTextColor(hdc, COLORREF(0x00333333));
                     let pause_used_str = format!("{} / {} min", pause_used_seconds / 60, pause_config.daily_budget_minutes);
-                    let mut value_rect = RECT { left: value_x, top: y, right: rect.right - 15, bottom: y + 22 };
+                    let mut value_rect = RECT { left: value_x, top: y, right: rect.right - scale(15), bottom: y + scale(22) };
                     DrawTextW(hdc, &mut pause_used_str.encode_utf16().collect::<Vec<_>>(), &mut value_rect, DT_SINGLELINE);
-                    y += 24;
+                    y += scale(24);
 
                     // Pause remaining
                     SelectObject(hdc, label_font);
                     SetTextColor(hdc, COLORREF(0x00666666));
-                    let mut label_rect = RECT { left: left_margin, top: y, right: value_x, bottom: y + 22 };
+                    let mut label_rect = RECT { left: left_margin, top: y, right: value_x, bottom: y + scale(22) };
                     DrawTextW(hdc, &mut "Pause Remaining:".encode_utf16().collect::<Vec<_>>(), &mut label_rect, DT_SINGLELINE);
 
                     SelectObject(hdc, value_font);
@@ -1152,35 +1151,35 @@ pub unsafe fn show_stats_dialog(parent_hwnd: HWND) {
                         SetTextColor(hdc, COLORREF(0x00008800)); // Green
                     }
                     let pause_remaining_str = format_duration(pause_remaining_seconds);
-                    let mut value_rect = RECT { left: value_x, top: y, right: rect.right - 15, bottom: y + 22 };
+                    let mut value_rect = RECT { left: value_x, top: y, right: rect.right - scale(15), bottom: y + scale(22) };
                     DrawTextW(hdc, &mut pause_remaining_str.encode_utf16().collect::<Vec<_>>(), &mut value_rect, DT_SINGLELINE);
-                    y += 24;
+                    y += scale(24);
 
                     // Pause count
                     SelectObject(hdc, label_font);
                     SetTextColor(hdc, COLORREF(0x00666666));
-                    let mut label_rect = RECT { left: left_margin, top: y, right: value_x, bottom: y + 22 };
+                    let mut label_rect = RECT { left: left_margin, top: y, right: value_x, bottom: y + scale(22) };
                     DrawTextW(hdc, &mut "Pauses Today:".encode_utf16().collect::<Vec<_>>(), &mut label_rect, DT_SINGLELINE);
 
                     SelectObject(hdc, value_font);
                     SetTextColor(hdc, COLORREF(0x00333333));
                     let pause_count_str = format!("{}", pause_log.len());
-                    let mut value_rect = RECT { left: value_x, top: y, right: rect.right - 15, bottom: y + 22 };
+                    let mut value_rect = RECT { left: value_x, top: y, right: rect.right - scale(15), bottom: y + scale(22) };
                     DrawTextW(hdc, &mut pause_count_str.encode_utf16().collect::<Vec<_>>(), &mut value_rect, DT_SINGLELINE);
-                    y += 24;
+                    y += scale(24);
 
                     // Pause log (if any)
                     if !pause_log.is_empty() {
                         SelectObject(hdc, small_font);
                         SetTextColor(hdc, COLORREF(0x00888888));
                         let log_str = format!("Log: {}", pause_log.join(", "));
-                        let mut log_rect = RECT { left: left_margin, top: y, right: rect.right - 15, bottom: y + 18 };
+                        let mut log_rect = RECT { left: left_margin, top: y, right: rect.right - scale(15), bottom: y + scale(18) };
                         DrawTextW(hdc, &mut log_str.encode_utf16().collect::<Vec<_>>(), &mut log_rect, DT_SINGLELINE);
                     }
                 } else {
                     SelectObject(hdc, label_font);
                     SetTextColor(hdc, COLORREF(0x00888888));
-                    let mut disabled_rect = RECT { left: left_margin, top: y, right: rect.right - 15, bottom: y + 22 };
+                    let mut disabled_rect = RECT { left: left_margin, top: y, right: rect.right - scale(15), bottom: y + scale(22) };
                     DrawTextW(hdc, &mut "Pause feature is disabled".encode_utf16().collect::<Vec<_>>(), &mut disabled_rect, DT_SINGLELINE);
                 }
 
@@ -1241,8 +1240,8 @@ pub unsafe fn show_stats_dialog(parent_hwnd: HWND) {
 
     let screen_width = GetSystemMetrics(SM_CXSCREEN);
     let screen_height = GetSystemMetrics(SM_CYSCREEN);
-    let dialog_width = 340;
-    let dialog_height = 390;
+    let dialog_width = scale(340);
+    let dialog_height = scale(390);
 
     let dialog_hwnd = CreateWindowExW(
         WS_EX_TOPMOST | WS_EX_DLGMODALFRAME,
@@ -1260,7 +1259,7 @@ pub unsafe fn show_stats_dialog(parent_hwnd: HWND) {
     );
 
     if let Ok(dlg) = dialog_hwnd {
-        let rgn = CreateRoundRectRgn(0, 0, dialog_width, dialog_height, 10, 10);
+        let rgn = CreateRoundRectRgn(0, 0, dialog_width, dialog_height, scale(10), scale(10));
         SetWindowRgn(dlg, rgn, true);
 
         let _ = ShowWindow(dlg, SW_SHOW);
