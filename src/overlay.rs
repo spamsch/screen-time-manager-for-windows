@@ -20,6 +20,7 @@ use windows::{
 };
 
 use crate::constants::*;
+use crate::dpi::scale;
 
 /// Global state for overlay window
 pub static OVERLAY_HWND: AtomicPtr<std::ffi::c_void> = AtomicPtr::new(std::ptr::null_mut());
@@ -34,7 +35,8 @@ pub unsafe fn create_overlay_window(hinstance: windows::Win32::Foundation::HMODU
     let screen_width = GetSystemMetrics(SM_CXSCREEN);
     let screen_height = GetSystemMetrics(SM_CYSCREEN);
 
-    let overlay_height = 120;
+    // Apply DPI scaling to height
+    let overlay_height = scale(120);
     let overlay_width = screen_width;
     let overlay_x = 0;
     let overlay_y = (screen_height - overlay_height) / 2;
@@ -117,7 +119,7 @@ pub unsafe extern "system" fn overlay_window_proc(
             let overlay_text_guard = OVERLAY_TEXT.lock().unwrap();
             if let Some(ref text) = *overlay_text_guard {
                 let hfont = CreateFontW(
-                    72, 0, 0, 0,
+                    scale(72), 0, 0, 0,
                     FW_BOLD.0 as i32,
                     0, 0, 0, 0, 0, 0, 0, 0,
                     w!("Segoe UI"),

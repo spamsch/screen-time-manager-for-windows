@@ -19,6 +19,7 @@ use windows::{
 use crate::blocking::REMAINING_SECONDS;
 use crate::constants::*;
 use crate::database;
+use crate::dpi::scale;
 
 /// Global state for mini overlay window
 pub static MINI_OVERLAY_HWND: AtomicPtr<std::ffi::c_void> = AtomicPtr::new(std::ptr::null_mut());
@@ -33,20 +34,25 @@ pub static SESSION_ACTIVE_SECONDS: AtomicI32 = AtomicI32::new(0);
 /// Timer ID for updating the mini overlay
 pub const TIMER_MINI_UPDATE: usize = 10;
 
-/// Mini overlay dimensions
-const MINI_WIDTH: i32 = 140;
-const MINI_HEIGHT: i32 = 36;
-const MINI_MARGIN: i32 = 10;
+/// Mini overlay base dimensions (at 96 DPI / 100% scaling)
+const MINI_WIDTH_BASE: i32 = 140;
+const MINI_HEIGHT_BASE: i32 = 36;
+const MINI_MARGIN_BASE: i32 = 10;
 
 /// Create the mini overlay window
 pub unsafe fn create_mini_overlay(hinstance: windows::Win32::Foundation::HMODULE) {
     let class_name = w!("ScreenTimeMiniOverlayClass");
 
+    // Apply DPI scaling to dimensions
+    let mini_width = scale(MINI_WIDTH_BASE);
+    let mini_height = scale(MINI_HEIGHT_BASE);
+    let mini_margin = scale(MINI_MARGIN_BASE);
+
     let screen_width = GetSystemMetrics(SM_CXSCREEN);
 
     // Position in top-right corner
-    let x = screen_width - MINI_WIDTH - MINI_MARGIN;
-    let y = MINI_MARGIN;
+    let x = screen_width - mini_width - mini_margin;
+    let y = mini_margin;
 
     let ex_style = WS_EX_TOPMOST | WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT;
 
@@ -57,8 +63,8 @@ pub unsafe fn create_mini_overlay(hinstance: windows::Win32::Foundation::HMODULE
         WS_POPUP,
         x,
         y,
-        MINI_WIDTH,
-        MINI_HEIGHT,
+        mini_width,
+        mini_height,
         None,
         None,
         hinstance,
@@ -340,9 +346,9 @@ pub unsafe extern "system" fn mini_overlay_proc(
                 (time_str, color)
             };
 
-            // Draw time
+            // Draw time (scaled font)
             let hfont = CreateFontW(
-                22, 0, 0, 0,
+                scale(22), 0, 0, 0,
                 FW_BOLD.0 as i32,
                 0, 0, 0, 0, 0, 0, 0, 0,
                 w!("Consolas"),

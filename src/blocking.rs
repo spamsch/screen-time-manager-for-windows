@@ -32,6 +32,7 @@ use windows::{
 
 use crate::constants::*;
 use crate::database::get_passcode;
+use crate::dpi::scale;
 
 /// Initiates a Windows shutdown with proper privilege handling
 unsafe fn initiate_shutdown() -> bool {
@@ -294,25 +295,25 @@ pub unsafe extern "system" fn blocking_overlay_proc(
             let screen_width = GetSystemMetrics(SM_CXSCREEN);
             let screen_height = GetSystemMetrics(SM_CYSCREEN);
 
-            // Expanded panel dimensions
-            let panel_width = 500;
-            let panel_height = 530;
+            // Expanded panel dimensions (DPI scaled)
+            let panel_width = scale(500);
+            let panel_height = scale(530);
             let _panel_x = (screen_width - panel_width) / 2;
             let panel_y = (screen_height - panel_height) / 2;
 
-            // Button font for extend buttons
+            // Button font for extend buttons (DPI scaled)
             let btn_font = CreateFontW(
-                18, 0, 0, 0,
+                scale(18), 0, 0, 0,
                 FW_BOLD.0 as i32,
                 0, 0, 0, 0, 0, 0, 0, 0,
                 w!("Segoe UI"),
             );
 
-            // Extend time buttons (in a row)
-            let extend_btn_width = 100;
-            let extend_btn_height = 40;
-            let extend_y = panel_y + 200;
-            let extend_spacing = 20;
+            // Extend time buttons (in a row) - DPI scaled
+            let extend_btn_width = scale(100);
+            let extend_btn_height = scale(40);
+            let extend_y = panel_y + scale(200);
+            let extend_spacing = scale(20);
             let total_extend_width = extend_btn_width * 3 + extend_spacing * 2;
             let extend_start_x = (screen_width - total_extend_width) / 2;
 
@@ -373,11 +374,11 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                 SendMessageW(h, WM_SETFONT, WPARAM(btn_font.0 as usize), LPARAM(1));
             }
 
-            // Passcode edit control
-            let edit_width = 200;
-            let edit_height = 50;
+            // Passcode edit control (DPI scaled)
+            let edit_width = scale(200);
+            let edit_height = scale(50);
             let edit_x = (screen_width - edit_width) / 2;
-            let edit_y = panel_y + 310;
+            let edit_y = panel_y + scale(310);
 
             let edit = CreateWindowExW(
                 WINDOW_EX_STYLE(0),
@@ -400,7 +401,7 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                 SendMessageW(e, EM_SETLIMITTEXT, WPARAM(4), LPARAM(0));
 
                 let hfont = CreateFontW(
-                    32, 0, 0, 0,
+                    scale(32), 0, 0, 0,
                     FW_BOLD.0 as i32,
                     0, 0, 0, 0, 0, 0, 0, 0,
                     w!("Segoe UI"),
@@ -408,11 +409,11 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                 SendMessageW(e, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
             }
 
-            // Unlock button
-            let btn_width = 200;
-            let btn_height = 45;
+            // Unlock button (DPI scaled)
+            let btn_width = scale(200);
+            let btn_height = scale(45);
             let btn_x = (screen_width - btn_width) / 2;
-            let btn_y = edit_y + edit_height + 15;
+            let btn_y = edit_y + edit_height + scale(15);
 
             let _ = CreateWindowExW(
                 WINDOW_EX_STYLE(0),
@@ -429,8 +430,8 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                 None,
             );
 
-            // Shutdown button
-            let shutdown_btn_y = btn_y + btn_height + 15;
+            // Shutdown button (DPI scaled)
+            let shutdown_btn_y = btn_y + btn_height + scale(15);
             let shutdown_btn = CreateWindowExW(
                 WINDOW_EX_STYLE(0),
                 w!("BUTTON"),
@@ -465,27 +466,27 @@ pub unsafe extern "system" fn blocking_overlay_proc(
             let screen_width = rect.right;
             let screen_height = rect.bottom;
 
-            // Expanded panel with more margin
-            let panel_width = 500;
-            let panel_height = 530;
+            // Expanded panel with more margin (DPI scaled)
+            let panel_width = scale(500);
+            let panel_height = scale(530);
             let panel_x = (screen_width - panel_width) / 2;
             let panel_y = (screen_height - panel_height) / 2;
 
             let panel_brush = CreateSolidBrush(COLORREF(COLOR_PANEL_BG));
             let old_brush = SelectObject(hdc, panel_brush);
-            let pen = CreatePen(PS_SOLID, 2, COLORREF(COLOR_ACCENT));
+            let pen = CreatePen(PS_SOLID, scale(2), COLORREF(COLOR_ACCENT));
             let old_pen = SelectObject(hdc, pen);
 
-            let _ = RoundRect(hdc, panel_x, panel_y, panel_x + panel_width, panel_y + panel_height, 20, 20);
+            let _ = RoundRect(hdc, panel_x, panel_y, panel_x + panel_width, panel_y + panel_height, scale(20), scale(20));
 
             SelectObject(hdc, old_brush);
             SelectObject(hdc, old_pen);
             let _ = DeleteObject(panel_brush);
             let _ = DeleteObject(pen);
 
-            // Title
+            // Title (DPI scaled font)
             let title_font = CreateFontW(
-                42, 0, 0, 0,
+                scale(42), 0, 0, 0,
                 FW_BOLD.0 as i32,
                 0, 0, 0, 0, 0, 0, 0, 0,
                 w!("Segoe UI"),
@@ -496,9 +497,9 @@ pub unsafe extern "system" fn blocking_overlay_proc(
 
             let mut title_rect = RECT {
                 left: panel_x,
-                top: panel_y + 25,
+                top: panel_y + scale(25),
                 right: panel_x + panel_width,
-                bottom: panel_y + 75,
+                bottom: panel_y + scale(75),
             };
             DrawTextW(
                 hdc,
@@ -507,10 +508,10 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                 DT_CENTER | DT_SINGLELINE,
             );
 
-            // Shutdown countdown display
+            // Shutdown countdown display (DPI scaled font)
             let shutdown_countdown = SHUTDOWN_COUNTDOWN_SECONDS.load(Ordering::SeqCst);
             let time_font = CreateFontW(
-                36, 0, 0, 0,
+                scale(36), 0, 0, 0,
                 FW_BOLD.0 as i32,
                 0, 0, 0, 0, 0, 0, 0, 0,
                 w!("Segoe UI"),
@@ -532,9 +533,9 @@ pub unsafe extern "system" fn blocking_overlay_proc(
             };
             let mut time_rect = RECT {
                 left: panel_x,
-                top: panel_y + 80,
+                top: panel_y + scale(80),
                 right: panel_x + panel_width,
-                bottom: panel_y + 120,
+                bottom: panel_y + scale(120),
             };
             let wide_time: Vec<u16> = time_str.encode_utf16().collect();
             DrawTextW(
@@ -544,9 +545,9 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                 DT_CENTER | DT_SINGLELINE,
             );
 
-            // Message
+            // Message (DPI scaled font)
             let msg_font = CreateFontW(
-                20, 0, 0, 0,
+                scale(20), 0, 0, 0,
                 FW_NORMAL.0 as i32,
                 0, 0, 0, 0, 0, 0, 0, 0,
                 w!("Segoe UI"),
@@ -557,10 +558,10 @@ pub unsafe extern "system" fn blocking_overlay_proc(
             let blocking_text_guard = BLOCKING_TEXT.lock().unwrap();
             let message = blocking_text_guard.as_ref().map(|s| s.as_str()).unwrap_or("Screen time limit reached");
             let mut msg_rect = RECT {
-                left: panel_x + 30,
-                top: panel_y + 125,
-                right: panel_x + panel_width - 30,
-                bottom: panel_y + 160,
+                left: panel_x + scale(30),
+                top: panel_y + scale(125),
+                right: panel_x + panel_width - scale(30),
+                bottom: panel_y + scale(160),
             };
             let wide_msg: Vec<u16> = message.encode_utf16().collect();
             DrawTextW(
@@ -571,9 +572,9 @@ pub unsafe extern "system" fn blocking_overlay_proc(
             );
             drop(blocking_text_guard);
 
-            // "Extend time:" label
+            // "Extend time:" label (DPI scaled font)
             let label_font = CreateFontW(
-                16, 0, 0, 0,
+                scale(16), 0, 0, 0,
                 FW_NORMAL.0 as i32,
                 0, 0, 0, 0, 0, 0, 0, 0,
                 w!("Segoe UI"),
@@ -583,9 +584,9 @@ pub unsafe extern "system" fn blocking_overlay_proc(
 
             let mut extend_label_rect = RECT {
                 left: panel_x,
-                top: panel_y + 170,
+                top: panel_y + scale(170),
                 right: panel_x + panel_width,
-                bottom: panel_y + 190,
+                bottom: panel_y + scale(190),
             };
             DrawTextW(
                 hdc,
@@ -597,9 +598,9 @@ pub unsafe extern "system" fn blocking_overlay_proc(
             // "Enter passcode to unlock:" label
             let mut passcode_label_rect = RECT {
                 left: panel_x,
-                top: panel_y + 260,
+                top: panel_y + scale(260),
                 right: panel_x + panel_width,
-                bottom: panel_y + 285,
+                bottom: panel_y + scale(285),
             };
             DrawTextW(
                 hdc,
@@ -613,9 +614,9 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                 SetTextColor(hdc, COLORREF(COLOR_ERROR));
                 let mut error_rect = RECT {
                     left: panel_x,
-                    top: panel_y + panel_height - 45,
+                    top: panel_y + panel_height - scale(45),
                     right: panel_x + panel_width,
-                    bottom: panel_y + panel_height - 20,
+                    bottom: panel_y + panel_height - scale(20),
                 };
                 DrawTextW(
                     hdc,
@@ -822,9 +823,9 @@ pub unsafe extern "system" fn secondary_overlay_proc(
             FillRect(hdc, &rect, bg_brush);
             let _ = DeleteObject(bg_brush);
 
-            // Draw "Screen Locked" text in center
+            // Draw "Screen Locked" text in center (DPI scaled)
             let font = CreateFontW(
-                48, 0, 0, 0,
+                scale(48), 0, 0, 0,
                 FW_BOLD.0 as i32,
                 0, 0, 0, 0, 0, 0, 0, 0,
                 w!("Segoe UI"),
