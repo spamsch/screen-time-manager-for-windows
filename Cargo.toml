@@ -1,6 +1,6 @@
 [package]
 name = "screen-time-manager"
-version = "1.0.32"
+version = "1.0.33"
 edition = "2021"
 description = "A screen time management application that runs in the system tray"
 authors = ["Shadow"]
