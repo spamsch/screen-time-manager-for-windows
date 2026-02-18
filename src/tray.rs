@@ -21,7 +21,7 @@ use crate::blocking::{extend_time, hide_blocking_overlay, show_blocking_overlay,
 use crate::constants::*;
 use crate::database::{get_blocking_message, get_warning_config, is_pause_enabled};
 use crate::dialogs::{show_settings_dialog, show_stats_dialog, verify_passcode_for_quit};
-use crate::mini_overlay::{is_paused, can_pause, toggle_pause, PauseBlockedReason, get_remaining_pause_budget};
+use crate::mini_overlay::{is_paused, is_idle_paused, can_pause, toggle_pause, PauseBlockedReason, get_remaining_pause_budget};
 use crate::overlay::{show_overlay, OVERLAY_HWND};
 use crate::telegram;
 use std::sync::atomic::Ordering;
@@ -145,17 +145,31 @@ unsafe fn show_context_menu_with_pause(hwnd: HWND, hmenu: HMENU, pause_text: PCW
     InsertMenuW(hmenu, 6, pause_flags, IDM_PAUSE_TOGGLE as usize, pause_text)
         .expect("Failed to insert pause menu item");
 
-    InsertMenuW(hmenu, 7, MF_BYPOSITION | MF_SEPARATOR, 0, PCWSTR::null())
+    let mut idx = 7;
+
+    // Show idle status if idle-paused
+    if is_idle_paused() {
+        InsertMenuW(hmenu, idx, MF_BYPOSITION | MF_STRING | MF_GRAYED, 0, w!("Idle: Paused"))
+            .expect("Failed to insert idle status");
+        idx += 1;
+    }
+
+    InsertMenuW(hmenu, idx, MF_BYPOSITION | MF_SEPARATOR, 0, PCWSTR::null())
         .expect("Failed to insert separator");
-    InsertMenuW(hmenu, 8, MF_BYPOSITION | MF_STRING, IDM_SHOW_OVERLAY as usize, w!("Show Warning (5s)"))
+    idx += 1;
+    InsertMenuW(hmenu, idx, MF_BYPOSITION | MF_STRING, IDM_SHOW_OVERLAY as usize, w!("Show Warning (5s)"))
         .expect("Failed to insert menu item");
-    InsertMenuW(hmenu, 9, MF_BYPOSITION | MF_STRING, IDM_SHOW_BLOCKING as usize, w!("Show Blocking Overlay"))
+    idx += 1;
+    InsertMenuW(hmenu, idx, MF_BYPOSITION | MF_STRING, IDM_SHOW_BLOCKING as usize, w!("Show Blocking Overlay"))
         .expect("Failed to insert menu item");
-    InsertMenuW(hmenu, 10, MF_BYPOSITION | MF_SEPARATOR, 0, PCWSTR::null())
+    idx += 1;
+    InsertMenuW(hmenu, idx, MF_BYPOSITION | MF_SEPARATOR, 0, PCWSTR::null())
         .expect("Failed to insert separator");
-    InsertMenuW(hmenu, 11, MF_BYPOSITION | MF_STRING, IDM_ABOUT as usize, w!("About"))
+    idx += 1;
+    InsertMenuW(hmenu, idx, MF_BYPOSITION | MF_STRING, IDM_ABOUT as usize, w!("About"))
         .expect("Failed to insert menu item");
-    InsertMenuW(hmenu, 12, MF_BYPOSITION | MF_STRING, IDM_QUIT as usize, w!("Quit"))
+    idx += 1;
+    InsertMenuW(hmenu, idx, MF_BYPOSITION | MF_STRING, IDM_QUIT as usize, w!("Quit"))
         .expect("Failed to insert menu item");
 
     let mut point = zeroed();

@@ -21,7 +21,7 @@ use windows::{
 };
 
 use crate::constants::*;
-use crate::database::{get_passcode, get_setting, set_setting, set_telegram_config, get_telegram_config, WEEKDAY_KEYS, WEEKDAY_NAMES, get_pause_used_today, get_pause_config, get_pause_log_today, is_pause_enabled};
+use crate::database::{get_passcode, get_setting, set_setting, set_telegram_config, get_telegram_config, WEEKDAY_KEYS, WEEKDAY_NAMES, get_pause_used_today, get_pause_config, get_pause_log_today, is_pause_enabled, is_idle_enabled, get_idle_timeout_minutes};
 use crate::dpi::scale;
 
 // Control IDs for settings dialog
@@ -51,6 +51,9 @@ struct SettingsEditHandles {
     telegram_enabled: HWND,
     // Lock screen timeout
     lock_screen_timeout: HWND,
+    // Idle detection settings
+    idle_enabled: HWND,
+    idle_timeout_minutes: HWND,
 }
 
 /// Verify passcode before allowing sensitive operations
@@ -677,6 +680,51 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                     SetWindowTextW(h, PCWSTR(wide.as_ptr())).ok();
                     lock_timeout_hwnd = h;
                 }
+                y_pos += scale(24);
+
+                // ===== Idle Detection Section =====
+                let title_idle = CreateWindowExW(
+                    WINDOW_EX_STYLE(0), w!("STATIC"), w!("Idle Detection"),
+                    WS_CHILD | WS_VISIBLE, scale(15), y_pos, scale(360), scale(20), hwnd, HMENU::default(), hinstance, None,
+                );
+                if let Ok(h) = title_idle { SendMessageW(h, WM_SETFONT, WPARAM(title_font.0 as usize), LPARAM(1)); }
+                y_pos += scale(20);
+
+                // Enable checkbox
+                let idle_enabled_chk = CreateWindowExW(
+                    WINDOW_EX_STYLE(0), w!("BUTTON"), w!("Auto-pause when idle"),
+                    WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    scale(25), y_pos, scale(200), scale(20), hwnd, HMENU::default(), hinstance, None,
+                );
+                let mut idle_enabled_hwnd = HWND::default();
+                if let Ok(h) = idle_enabled_chk {
+                    SendMessageW(h, WM_SETFONT, WPARAM(label_font.0 as usize), LPARAM(1));
+                    if is_idle_enabled() {
+                        SendMessageW(h, BM_SETCHECK, WPARAM(1), LPARAM(0));
+                    }
+                    idle_enabled_hwnd = h;
+                }
+                y_pos += scale(22);
+
+                // Timeout minutes
+                let _ = CreateWindowExW(
+                    WINDOW_EX_STYLE(0), w!("STATIC"), w!("Idle timeout (min):"),
+                    WS_CHILD | WS_VISIBLE, scale(25), y_pos + scale(2), scale(150), scale(20), hwnd, HMENU::default(), hinstance, None,
+                );
+                let idle_timeout_edit = CreateWindowExW(
+                    WINDOW_EX_STYLE(0x200), w!("EDIT"), w!(""),
+                    WS_CHILD | WS_VISIBLE | WS_BORDER | WINDOW_STYLE(ES_NUMBER as u32 | ES_CENTER as u32),
+                    scale(180), y_pos, scale(50), scale(22), hwnd, HMENU::default(), hinstance, None,
+                );
+                let mut idle_timeout_hwnd = HWND::default();
+                if let Ok(h) = idle_timeout_edit {
+                    SendMessageW(h, WM_SETFONT, WPARAM(edit_font.0 as usize), LPARAM(1));
+                    SendMessageW(h, EM_SETLIMITTEXT, WPARAM(3), LPARAM(0));
+                    let value = get_idle_timeout_minutes().to_string();
+                    let wide: Vec<u16> = value.encode_utf16().chain(std::iter::once(0)).collect();
+                    SetWindowTextW(h, PCWSTR(wide.as_ptr())).ok();
+                    idle_timeout_hwnd = h;
+                }
                 y_pos += scale(28);
 
                 // ===== Buttons =====
@@ -712,6 +760,8 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                     telegram_chat_id: telegram_chat_id_hwnd,
                     telegram_enabled: telegram_enabled_hwnd,
                     lock_screen_timeout: lock_timeout_hwnd,
+                    idle_enabled: idle_enabled_hwnd,
+                    idle_timeout_minutes: idle_timeout_hwnd,
                 });
 
                 LRESULT(0)
@@ -846,6 +896,20 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                                 set_setting("lock_screen_timeout", &seconds.to_string());
                             }
                         }
+
+                        // Save idle detection settings
+                        if !handles.idle_enabled.0.is_null() {
+                            let checked = SendMessageW(handles.idle_enabled, BM_GETCHECK, WPARAM(0), LPARAM(0));
+                            set_setting("idle_enabled", if checked.0 == 1 { "1" } else { "0" });
+                        }
+                        if !handles.idle_timeout_minutes.0.is_null() {
+                            let mut buffer = [0u16; 16];
+                            let len = GetWindowTextW(handles.idle_timeout_minutes, &mut buffer);
+                            let value = String::from_utf16_lossy(&buffer[..len as usize]);
+                            if !value.is_empty() {
+                                set_setting("idle_timeout_minutes", &value);
+                            }
+                        }
                     }
 
                     MessageBoxW(hwnd, w!("Settings saved successfully!"), w!("Settings"), MB_OK | MB_ICONINFORMATION);
@@ -884,7 +948,7 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
     let screen_width = GetSystemMetrics(SM_CXSCREEN);
     let screen_height = GetSystemMetrics(SM_CYSCREEN);
     let dialog_width = scale(400);
-    let dialog_height = scale(580);
+    let dialog_height = scale(670);
 
     let dialog_hwnd = CreateWindowExW(
         WS_EX_TOPMOST | WS_EX_DLGMODALFRAME,

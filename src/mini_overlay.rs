@@ -12,6 +12,8 @@ use windows::{
             InvalidateRect, SelectObject, SetBkMode, SetTextColor, DrawTextW,
             DT_CENTER, DT_SINGLELINE, DT_VCENTER, FW_BOLD, PAINTSTRUCT, TRANSPARENT,
         },
+        System::SystemInformation::GetTickCount,
+        UI::Input::GetLastInputInfo,
         UI::WindowsAndMessaging::*,
     },
 };
@@ -30,6 +32,9 @@ pub static IS_PAUSED: AtomicBool = AtomicBool::new(false);
 pub static PAUSE_START_TIMESTAMP: AtomicI64 = AtomicI64::new(0);
 pub static CURRENT_PAUSE_DURATION: AtomicI32 = AtomicI32::new(0);
 pub static SESSION_ACTIVE_SECONDS: AtomicI32 = AtomicI32::new(0);
+
+// Idle detection state (independent from manual pause)
+pub static IS_IDLE_PAUSED: AtomicBool = AtomicBool::new(false);
 
 /// Timer ID for updating the mini overlay
 pub const TIMER_MINI_UPDATE: usize = 10;
@@ -304,6 +309,55 @@ fn force_resume() {
     resume_timer();
 }
 
+// ============================================================================
+// Idle Detection Functions
+// ============================================================================
+
+/// Get the number of seconds since the last user input (mouse/keyboard)
+fn get_idle_seconds() -> u32 {
+    unsafe {
+        let mut lii: windows::Win32::UI::Input::LASTINPUTINFO = zeroed();
+        lii.cbSize = std::mem::size_of::<windows::Win32::UI::Input::LASTINPUTINFO>() as u32;
+        if GetLastInputInfo(&mut lii).as_bool() {
+            let now = GetTickCount();
+            (now - lii.dwTime) / 1000
+        } else {
+            0
+        }
+    }
+}
+
+/// Check idle state and update IS_IDLE_PAUSED accordingly
+fn check_idle_state() {
+    // Skip if idle detection is disabled
+    if !database::is_idle_enabled() {
+        // If it was idle-paused but feature got disabled, resume
+        if IS_IDLE_PAUSED.load(Ordering::SeqCst) {
+            IS_IDLE_PAUSED.store(false, Ordering::SeqCst);
+        }
+        return;
+    }
+
+    let idle_seconds = get_idle_seconds();
+    let threshold_seconds = database::get_idle_timeout_minutes() * 60;
+    let currently_idle_paused = IS_IDLE_PAUSED.load(Ordering::SeqCst);
+
+    if idle_seconds >= threshold_seconds {
+        // User is idle - pause if not already paused (manual or idle)
+        if !currently_idle_paused && !IS_PAUSED.load(Ordering::SeqCst) {
+            IS_IDLE_PAUSED.store(true, Ordering::SeqCst);
+        }
+    } else if currently_idle_paused {
+        // User is back - resume from idle pause
+        IS_IDLE_PAUSED.store(false, Ordering::SeqCst);
+    }
+}
+
+/// Check if timer is currently idle-paused
+pub fn is_idle_paused() -> bool {
+    IS_IDLE_PAUSED.load(Ordering::SeqCst)
+}
+
 /// Window procedure for the mini overlay
 pub unsafe extern "system" fn mini_overlay_proc(
     hwnd: HWND,
@@ -320,9 +374,16 @@ pub unsafe extern "system" fn mini_overlay_proc(
             GetClientRect(hwnd, &mut rect).ok();
 
             let paused = IS_PAUSED.load(Ordering::SeqCst);
+            let idle_paused = IS_IDLE_PAUSED.load(Ordering::SeqCst);
 
             // Background color changes when paused
-            let bg_color = if paused { 0x00332200 } else { 0x00222222 }; // Brownish when paused
+            let bg_color = if paused {
+                0x00332200 // Brownish when manually paused
+            } else if idle_paused {
+                0x00333333 // Grey when idle-paused
+            } else {
+                0x00222222 // Normal
+            };
             let bg_brush = CreateSolidBrush(COLORREF(bg_color));
             FillRect(hdc, &rect, bg_brush);
             let _ = DeleteObject(bg_brush);
@@ -336,9 +397,13 @@ pub unsafe extern "system" fn mini_overlay_proc(
                 let max_duration = get_max_pause_duration();
                 let pause_remaining = max_duration - pause_duration;
 
-                // Format: "⏸ 0:45" (pause symbol + remaining pause time)
+                // Format: "II 0:45" (pause symbol + remaining pause time)
                 let pause_time_str = format_time_compact(pause_remaining);
                 (format!("II {}", pause_time_str), 0x0066CCFF_u32) // Cyan/light blue for paused
+            } else if idle_paused {
+                // Show idle indicator with remaining time
+                let time_str = format_time_compact(remaining);
+                (format!("ZZ {}", time_str), 0x00888888_u32) // Grey/muted for idle
             } else {
                 // Normal display
                 let time_str = format_time_compact(remaining);
@@ -375,9 +440,10 @@ pub unsafe extern "system" fn mini_overlay_proc(
         WM_TIMER => {
             if wparam.0 == TIMER_MINI_UPDATE {
                 let paused = IS_PAUSED.load(Ordering::SeqCst);
+                let idle_paused = IS_IDLE_PAUSED.load(Ordering::SeqCst);
 
                 if paused {
-                    // Timer is paused - increment pause duration instead
+                    // Timer is manually paused - increment pause duration instead
                     let duration = CURRENT_PAUSE_DURATION.fetch_add(1, Ordering::SeqCst) + 1;
                     let max_duration = get_max_pause_duration();
 
@@ -386,6 +452,9 @@ pub unsafe extern "system" fn mini_overlay_proc(
                         // Auto-resume
                         force_resume();
                     }
+                } else if idle_paused {
+                    // Timer is idle-paused - don't decrement time, don't track session time
+                    // Just redraw to keep the display updated
                 } else {
                     // Timer is running normally
                     let current = REMAINING_SECONDS.load(Ordering::SeqCst);
@@ -423,6 +492,10 @@ pub unsafe extern "system" fn mini_overlay_proc(
                         }
                     }
                 }
+
+                // Always check idle state (even during manual pause, to track transitions)
+                check_idle_state();
+
                 let _ = InvalidateRect(hwnd, None, true);
             }
             LRESULT(0)

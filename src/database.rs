@@ -85,6 +85,9 @@ pub fn init_database() -> Result<(), Box<dyn std::error::Error>> {
         ("pause_min_active_time", "10"),     // Min minutes before first pause allowed
         // Lock screen timeout (seconds before shutdown, default 10 minutes)
         ("lock_screen_timeout", "600"),
+        // Idle detection settings
+        ("idle_enabled", "1"),              // 1 = enabled, 0 = disabled
+        ("idle_timeout_minutes", "5"),      // Minutes of inactivity before auto-pause
     ];
 
     for (key, value) in defaults {
@@ -372,6 +375,24 @@ pub fn get_pause_log_today() -> Vec<String> {
     get_setting(&key)
         .map(|s| s.split(',').map(|e| e.to_string()).collect())
         .unwrap_or_default()
+}
+
+// ============================================================================
+// Idle Detection Functions
+// ============================================================================
+
+/// Check if idle detection is enabled
+pub fn is_idle_enabled() -> bool {
+    get_setting("idle_enabled")
+        .map(|s| s == "1")
+        .unwrap_or(true)
+}
+
+/// Get idle timeout in minutes
+pub fn get_idle_timeout_minutes() -> u32 {
+    get_setting("idle_timeout_minutes")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(5)
 }
 
 // ============================================================================

@@ -17,6 +17,7 @@ windows = { version = "0.58", features = [
     "Win32_System_Shutdown",
     "Win32_Graphics_Gdi",
     "Win32_UI_Controls",
+    "Win32_UI_Input",
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_Media_Audio",
     "Win32_System_Threading",
