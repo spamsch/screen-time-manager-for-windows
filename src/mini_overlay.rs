@@ -320,7 +320,7 @@ fn get_idle_seconds() -> u32 {
         lii.cbSize = std::mem::size_of::<windows::Win32::UI::Input::LASTINPUTINFO>() as u32;
         if GetLastInputInfo(&mut lii).as_bool() {
             let now = GetTickCount();
-            (now - lii.dwTime) / 1000
+            now.wrapping_sub(lii.dwTime) / 1000
         } else {
             0
         }
@@ -356,6 +356,11 @@ fn check_idle_state() {
 /// Check if timer is currently idle-paused
 pub fn is_idle_paused() -> bool {
     IS_IDLE_PAUSED.load(Ordering::SeqCst)
+}
+
+/// Check if timer is effectively paused (manual OR idle)
+pub fn is_effectively_paused() -> bool {
+    IS_PAUSED.load(Ordering::SeqCst) || IS_IDLE_PAUSED.load(Ordering::SeqCst)
 }
 
 /// Window procedure for the mini overlay

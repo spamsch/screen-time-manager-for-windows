@@ -388,11 +388,12 @@ pub fn is_idle_enabled() -> bool {
         .unwrap_or(true)
 }
 
-/// Get idle timeout in minutes
+/// Get idle timeout in minutes (minimum 1)
 pub fn get_idle_timeout_minutes() -> u32 {
     get_setting("idle_timeout_minutes")
         .and_then(|s| s.parse().ok())
         .unwrap_or(5)
+        .max(1)
 }
 
 // ============================================================================

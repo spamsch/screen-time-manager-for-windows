@@ -906,8 +906,9 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                             let mut buffer = [0u16; 16];
                             let len = GetWindowTextW(handles.idle_timeout_minutes, &mut buffer);
                             let value = String::from_utf16_lossy(&buffer[..len as usize]);
-                            if !value.is_empty() {
-                                set_setting("idle_timeout_minutes", &value);
+                            if let Ok(mins) = value.parse::<u32>() {
+                                let clamped = mins.max(1);
+                                set_setting("idle_timeout_minutes", &clamped.to_string());
                             }
                         }
                     }

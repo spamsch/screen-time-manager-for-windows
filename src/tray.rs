@@ -77,8 +77,11 @@ pub unsafe fn show_context_menu(hwnd: HWND) {
     let pause_enabled = is_pause_enabled();
 
     let (pause_text, pause_flags) = if paused {
-        // Currently paused - show resume option (always available)
+        // Currently manually paused - show resume option (always available)
         ("Resume Timer", MF_BYPOSITION | MF_STRING)
+    } else if is_idle_paused() {
+        // Currently idle-paused - grey out manual pause (already paused via idle)
+        ("Pause (Idle paused)", MF_BYPOSITION | MF_STRING | MF_GRAYED)
     } else if !pause_enabled {
         // Pause feature disabled
         ("Pause (Disabled)", MF_BYPOSITION | MF_STRING | MF_GRAYED)

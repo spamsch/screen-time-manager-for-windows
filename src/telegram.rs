@@ -232,6 +232,7 @@ async fn handle_command(
 fn cmd_status() -> String {
     let remaining = blocking::get_remaining_seconds();
     let paused = mini_overlay::is_paused();
+    let idle_paused = mini_overlay::is_idle_paused();
     let pause_budget = mini_overlay::get_remaining_pause_budget();
 
     let mins = remaining / 60;
@@ -245,6 +246,14 @@ fn cmd_status() -> String {
         "🟢"
     };
 
+    let pause_status = if paused {
+        "Yes (manual)"
+    } else if idle_paused {
+        "Yes (idle)"
+    } else {
+        "No"
+    };
+
     format!(
         "Screen Time Status\n\
          ━━━━━━━━━━━━━━━━━━\n\
@@ -253,7 +262,7 @@ fn cmd_status() -> String {
          🔋 Pause budget: {} min",
         status_emoji,
         mins, secs,
-        if paused { "Yes" } else { "No" },
+        pause_status,
         pause_budget / 60
     )
 }
@@ -327,6 +336,9 @@ fn cmd_pause() -> String {
     if mini_overlay::is_paused() {
         return "⏸ Timer is already paused. Use /resume to continue.".to_string();
     }
+    if mini_overlay::is_idle_paused() {
+        return "⏸ Timer is already paused (idle). It will resume automatically when input is detected.".to_string();
+    }
 
     match mini_overlay::toggle_pause() {
         Ok(true) => "⏸ Timer paused".to_string(),
@@ -336,6 +348,9 @@ fn cmd_pause() -> String {
 }
 
 fn cmd_resume() -> String {
+    if mini_overlay::is_idle_paused() {
+        return "▶️ Timer is idle-paused. It will resume automatically when input is detected.".to_string();
+    }
     if !mini_overlay::is_paused() {
         return "▶️ Timer is not paused".to_string();
     }
