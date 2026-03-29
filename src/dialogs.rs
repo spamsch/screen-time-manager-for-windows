@@ -407,7 +407,7 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                 }
 
                 // ===== Warning 1 Section =====
-                y_pos += scale(4);
+                y_pos += scale(10);
                 let title2 = CreateWindowExW(
                     WINDOW_EX_STYLE(0), w!("STATIC"), w!("First Warning"),
                     WS_CHILD | WS_VISIBLE, scale(15), y_pos, scale(350), scale(20), hwnd, HMENU::default(), hinstance, None,
@@ -454,6 +454,7 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                 y_pos += scale(24);
 
                 // ===== Warning 2 Section =====
+                y_pos += scale(10);
                 let title3 = CreateWindowExW(
                     WINDOW_EX_STYLE(0), w!("STATIC"), w!("Second Warning"),
                     WS_CHILD | WS_VISIBLE, scale(15), y_pos, scale(350), scale(20), hwnd, HMENU::default(), hinstance, None,
@@ -500,6 +501,7 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                 y_pos += scale(24);
 
                 // ===== Blocking Message Section =====
+                y_pos += scale(10);
                 let title4 = CreateWindowExW(
                     WINDOW_EX_STYLE(0), w!("STATIC"), w!("Blocking Screen Message"),
                     WS_CHILD | WS_VISIBLE, scale(15), y_pos, scale(350), scale(20), hwnd, HMENU::default(), hinstance, None,
@@ -523,6 +525,7 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                 y_pos += scale(24);
 
                 // ===== Change Passcode Section =====
+                y_pos += scale(10);
                 let title5 = CreateWindowExW(
                     WINDOW_EX_STYLE(0), w!("STATIC"), w!("Change Passcode (leave blank to keep)"),
                     WS_CHILD | WS_VISIBLE, scale(15), y_pos, scale(360), scale(20), hwnd, HMENU::default(), hinstance, None,
@@ -580,6 +583,7 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                 y_pos += scale(24);
 
                 // ===== Telegram Bot Section =====
+                y_pos += scale(10);
                 let title6 = CreateWindowExW(
                     WINDOW_EX_STYLE(0), w!("STATIC"), w!("Telegram Bot"),
                     WS_CHILD | WS_VISIBLE, scale(15), y_pos, scale(360), scale(20), hwnd, HMENU::default(), hinstance, None,
@@ -652,6 +656,7 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                 y_pos += scale(24);
 
                 // ===== Lock Screen Timeout =====
+                y_pos += scale(10);
                 let title7 = CreateWindowExW(
                     WINDOW_EX_STYLE(0), w!("STATIC"), w!("Lock Screen"),
                     WS_CHILD | WS_VISIBLE, scale(15), y_pos, scale(360), scale(20), hwnd, HMENU::default(), hinstance, None,
@@ -683,6 +688,7 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                 y_pos += scale(24);
 
                 // ===== Idle Detection Section =====
+                y_pos += scale(10);
                 let title_idle = CreateWindowExW(
                     WINDOW_EX_STYLE(0), w!("STATIC"), w!("Idle Detection"),
                     WS_CHILD | WS_VISIBLE, scale(15), y_pos, scale(360), scale(20), hwnd, HMENU::default(), hinstance, None,
@@ -967,7 +973,7 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
     let screen_width = GetSystemMetrics(SM_CXSCREEN);
     let screen_height = GetSystemMetrics(SM_CYSCREEN);
     let dialog_width = scale(400);
-    let dialog_height = scale(670);
+    let dialog_height = scale(740);
 
     let dialog_hwnd = CreateWindowExW(
         WS_EX_TOPMOST | WS_EX_DLGMODALFRAME,
