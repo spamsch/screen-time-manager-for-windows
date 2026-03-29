@@ -66,9 +66,9 @@ pub fn init_database() -> Result<(), Box<dyn std::error::Error>> {
         ("limit_tuesday", "120"),
         ("limit_wednesday", "120"),
         ("limit_thursday", "120"),
-        ("limit_friday", "180"),
-        ("limit_saturday", "240"),
-        ("limit_sunday", "240"),
+        ("limit_friday", "120"),
+        ("limit_saturday", "120"),
+        ("limit_sunday", "120"),
         // First warning (minutes before limit)
         ("warning1_minutes", "10"),
         ("warning1_message", "10 minutes remaining!"),

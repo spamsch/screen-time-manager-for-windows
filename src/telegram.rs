@@ -44,6 +44,16 @@ enum Command {
     Msg(String),
     #[command(description = "Lock the screen")]
     Lock,
+    #[command(description = "Lock the screen (alias)")]
+    Stop,
+    #[command(description = "Reset timer to daily limit")]
+    Reset,
+    #[command(description = "Extend by 30 minutes")]
+    E30,
+    #[command(description = "Extend by 60 minutes")]
+    E60,
+    #[command(description = "Extend by 120 minutes")]
+    E120,
     #[command(description = "Get your chat ID for setup")]
     Chatid,
     #[command(description = "Show this help message")]
@@ -123,16 +133,29 @@ async fn run_bot(token: String, admin_chat_id: Option<i64>) {
             handle_command(bot, msg, cmd, admin_chat_id)
         });
 
-    // Fallback handler for unrecognized messages (helps with debugging)
+    // Fallback handler: show plain text as on-screen message (authorized users only)
     let fallback_handler = Update::filter_message()
-        .endpoint(|bot: Bot, msg: Message| async move {
-            // Only respond to text messages that look like commands
+        .endpoint(move |bot: Bot, msg: Message| async move {
             if let Some(text) = msg.text() {
                 if text.starts_with('/') {
                     bot.send_message(
                         msg.chat.id,
                         format!("Unknown command: {}\nUse /help to see available commands.", text)
                     ).await?;
+                } else if !text.is_empty() {
+                    // Check authorization
+                    let authorized = admin_chat_id
+                        .map(|id| msg.chat.id.0 == id)
+                        .unwrap_or(false);
+                    if authorized {
+                        unsafe {
+                            overlay::show_overlay(text, 10);
+                        }
+                        bot.send_message(
+                            msg.chat.id,
+                            format!("📢 Message shown: \"{}\"", text)
+                        ).await?;
+                    }
                 }
             }
             Ok(())
@@ -217,6 +240,11 @@ async fn handle_command(
         Command::History => cmd_history(),
         Command::Msg(text) => cmd_msg(&text),
         Command::Lock => cmd_lock(),
+        Command::Stop => cmd_lock(),
+        Command::Reset => cmd_reset(),
+        Command::E30 => cmd_extend(30),
+        Command::E60 => cmd_extend(60),
+        Command::E120 => cmd_extend(120),
         Command::Chatid => unreachable!(), // Handled above
         Command::Help => Command::descriptions().to_string(),
     };
@@ -410,6 +438,28 @@ fn cmd_msg(text: &str) -> String {
     }
 
     format!("📢 Message shown: \"{}\"", text)
+}
+
+fn cmd_reset() -> String {
+    let weekday = database::get_current_weekday();
+    let daily_limit_minutes = database::get_daily_limit(weekday);
+    let daily_limit_seconds = (daily_limit_minutes * 60) as i32;
+
+    blocking::REMAINING_SECONDS.store(daily_limit_seconds, std::sync::atomic::Ordering::SeqCst);
+    database::save_remaining_time(daily_limit_seconds);
+
+    unsafe {
+        mini_overlay::update_mini_overlay();
+        // Hide the blocking overlay if it's showing
+        blocking::hide_blocking_overlay();
+    }
+
+    format!(
+        "🔄 Timer reset to daily limit ({} min)\nRemaining: {}:{:02}",
+        daily_limit_minutes,
+        daily_limit_seconds / 60,
+        daily_limit_seconds % 60
+    )
 }
 
 fn cmd_lock() -> String {

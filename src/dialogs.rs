@@ -827,6 +827,24 @@ pub unsafe fn show_settings_dialog(parent_hwnd: HWND) {
                             }
                         }
 
+                        // If today's limit was lowered, cap remaining time to the new limit
+                        {
+                            use crate::blocking::REMAINING_SECONDS;
+                            use crate::database::{get_current_weekday, get_daily_limit, save_remaining_time};
+                            use crate::mini_overlay::update_mini_overlay;
+                            use std::sync::atomic::Ordering;
+
+                            let weekday = get_current_weekday();
+                            let new_limit_seconds = (get_daily_limit(weekday) * 60) as i32;
+                            let remaining = REMAINING_SECONDS.load(Ordering::SeqCst);
+
+                            if remaining > new_limit_seconds {
+                                REMAINING_SECONDS.store(new_limit_seconds, Ordering::SeqCst);
+                                save_remaining_time(new_limit_seconds);
+                                update_mini_overlay();
+                            }
+                        }
+
                         if !handles.warning1_minutes.0.is_null() {
                             let mut buffer = [0u16; 16];
                             let len = GetWindowTextW(handles.warning1_minutes, &mut buffer);
