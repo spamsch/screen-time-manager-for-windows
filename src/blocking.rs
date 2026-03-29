@@ -9,10 +9,11 @@ use windows::{
     Win32::{
         Foundation::{BOOL, COLORREF, HWND, LPARAM, LRESULT, RECT, WPARAM, CloseHandle},
         Graphics::Gdi::{
-            BeginPaint, CreateFontW, CreatePen, CreateSolidBrush, DeleteObject, DrawTextW,
-            EndPaint, EnumDisplayMonitors, FillRect, InvalidateRect, RoundRect, SelectObject,
-            SetBkMode, SetTextColor, DT_CENTER, DT_SINGLELINE, DT_VCENTER, FW_BOLD, FW_NORMAL,
-            HDC, HMONITOR, PAINTSTRUCT, PS_SOLID, TRANSPARENT,
+            BeginPaint, BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, CreateFontW,
+            CreatePen, CreateSolidBrush, DeleteDC, DeleteObject, DrawTextW, EndPaint,
+            EnumDisplayMonitors, FillRect, InvalidateRect, RoundRect, SelectObject, SetBkMode,
+            SetTextColor, DT_CENTER, DT_SINGLELINE, DT_VCENTER, FW_BOLD, FW_NORMAL, HDC,
+            HMONITOR, PAINTSTRUCT, PS_SOLID, SRCCOPY, TRANSPARENT,
         },
         Media::Audio::{PlaySoundW, SND_ALIAS, SND_ASYNC},
         System::LibraryLoader::GetModuleHandleW,
@@ -127,7 +128,7 @@ pub unsafe fn create_blocking_overlay(hinstance: windows::Win32::Foundation::HMO
         ex_style,
         class_name,
         PCWSTR(window_title.as_ptr()),
-        WS_POPUP,
+        WS_POPUP | WS_CLIPCHILDREN,  // CLIPCHILDREN prevents drawing over child controls
         0,
         0,
         screen_width,
@@ -299,29 +300,29 @@ pub unsafe extern "system" fn blocking_overlay_proc(
             let screen_width = GetSystemMetrics(SM_CXSCREEN);
             let screen_height = GetSystemMetrics(SM_CYSCREEN);
 
-            // Expanded panel dimensions (DPI scaled)
-            let panel_width = scale(500);
-            let panel_height = scale(530);
-            let _panel_x = (screen_width - panel_width) / 2;
+            // Panel dimensions - must match WM_PAINT
+            let _panel_width = scale(480);
+            let panel_height = scale(520);
             let panel_y = (screen_height - panel_height) / 2;
 
-            // Button font for extend buttons (DPI scaled, ClearType quality = 5)
+            // Shared button font
             let btn_font = CreateFontW(
-                scale(18), 0, 0, 0,
+                scale(16), 0, 0, 0,
                 FW_BOLD.0 as i32,
                 0, 0, 0, 0, 0, 0, 5, 0,
                 w!("Segoe UI"),
             );
 
-            // Extend time buttons (in a row) - DPI scaled
-            let extend_btn_width = scale(100);
-            let extend_btn_height = scale(40);
-            let extend_y = panel_y + scale(200);
-            let extend_spacing = scale(20);
+            // Layout: Icon -> Title -> Countdown -> Message -> Extend label -> Extend buttons -> Separator -> Passcode section
+
+            // Extend time buttons - positioned below the "Extend time:" label (which is at scale(200))
+            let extend_btn_width = scale(90);
+            let extend_btn_height = scale(36);
+            let extend_y = panel_y + scale(220);
+            let extend_spacing = scale(15);
             let total_extend_width = extend_btn_width * 3 + extend_spacing * 2;
             let extend_start_x = (screen_width - total_extend_width) / 2;
 
-            // +15 min button
             let btn_15_text = i18n::wide("blocking.extend_15");
             let btn_15 = CreateWindowExW(
                 WINDOW_EX_STYLE(0),
@@ -341,7 +342,6 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                 SendMessageW(h, WM_SETFONT, WPARAM(btn_font.0 as usize), LPARAM(1));
             }
 
-            // +30 min button
             let btn_30_text = i18n::wide("blocking.extend_30");
             let btn_30 = CreateWindowExW(
                 WINDOW_EX_STYLE(0),
@@ -361,7 +361,6 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                 SendMessageW(h, WM_SETFONT, WPARAM(btn_font.0 as usize), LPARAM(1));
             }
 
-            // +60 min button
             let btn_60_text = i18n::wide("blocking.extend_60");
             let btn_60 = CreateWindowExW(
                 WINDOW_EX_STYLE(0),
@@ -381,11 +380,14 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                 SendMessageW(h, WM_SETFONT, WPARAM(btn_font.0 as usize), LPARAM(1));
             }
 
-            // Passcode edit control (DPI scaled)
-            let edit_width = scale(200);
-            let edit_height = scale(50);
+            // Passcode section - positioned lower with better spacing
+            let passcode_section_y = panel_y + scale(310);
+
+            // Passcode edit control - smaller height
+            let edit_width = scale(180);
+            let edit_height = scale(44);
             let edit_x = (screen_width - edit_width) / 2;
-            let edit_y = panel_y + scale(310);
+            let edit_y = passcode_section_y;
 
             let edit = CreateWindowExW(
                 WINDOW_EX_STYLE(0),
@@ -408,7 +410,7 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                 SendMessageW(e, EM_SETLIMITTEXT, WPARAM(4), LPARAM(0));
 
                 let hfont = CreateFontW(
-                    scale(32), 0, 0, 0,
+                    scale(28), 0, 0, 0,
                     FW_BOLD.0 as i32,
                     0, 0, 0, 0, 0, 0, 5, 0,
                     w!("Segoe UI"),
@@ -416,14 +418,14 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                 SendMessageW(e, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
             }
 
-            // Unlock button (DPI scaled)
-            let btn_width = scale(200);
-            let btn_height = scale(45);
+            // Unlock button
+            let btn_width = scale(180);
+            let btn_height = scale(40);
             let btn_x = (screen_width - btn_width) / 2;
-            let btn_y = edit_y + edit_height + scale(15);
+            let btn_y = edit_y + edit_height + scale(12);
 
             let unlock_text = i18n::wide("blocking.unlock");
-            let _ = CreateWindowExW(
+            let unlock_btn = CreateWindowExW(
                 WINDOW_EX_STYLE(0),
                 w!("BUTTON"),
                 PCWSTR(unlock_text.as_ptr()),
@@ -437,9 +439,12 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                 hinstance,
                 None,
             );
+            if let Ok(h) = unlock_btn {
+                SendMessageW(h, WM_SETFONT, WPARAM(btn_font.0 as usize), LPARAM(1));
+            }
 
-            // Shutdown button (DPI scaled)
-            let shutdown_btn_y = btn_y + btn_height + scale(15);
+            // Shutdown button
+            let shutdown_btn_y = btn_y + btn_height + scale(10);
             let shutdown_text = i18n::wide("blocking.shutdown");
             let shutdown_btn = CreateWindowExW(
                 WINDOW_EX_STYLE(0),
@@ -463,11 +468,18 @@ pub unsafe extern "system" fn blocking_overlay_proc(
         }
         WM_PAINT => {
             let mut ps: PAINTSTRUCT = zeroed();
-            let hdc = BeginPaint(hwnd, &mut ps);
+            let hdc_screen = BeginPaint(hwnd, &mut ps);
 
             let mut rect: RECT = zeroed();
             GetClientRect(hwnd, &mut rect).ok();
 
+            // Double buffering to prevent flicker
+            let hdc_mem = CreateCompatibleDC(hdc_screen);
+            let hbm = CreateCompatibleBitmap(hdc_screen, rect.right, rect.bottom);
+            let hbm_old = SelectObject(hdc_mem, hbm);
+            let hdc = hdc_mem;
+
+            // Draw to memory DC
             let bg_brush = CreateSolidBrush(COLORREF(COLOR_OVERLAY_BG));
             FillRect(hdc, &rect, bg_brush);
             let _ = DeleteObject(bg_brush);
@@ -475,63 +487,80 @@ pub unsafe extern "system" fn blocking_overlay_proc(
             let screen_width = rect.right;
             let screen_height = rect.bottom;
 
-            // Expanded panel with more margin (DPI scaled)
-            let panel_width = scale(500);
-            let panel_height = scale(530);
+            // Panel dimensions
+            let panel_width = scale(480);
+            let panel_height = scale(520);
             let panel_x = (screen_width - panel_width) / 2;
             let panel_y = (screen_height - panel_height) / 2;
 
+            // Panel with rounded corners and accent border
             let panel_brush = CreateSolidBrush(COLORREF(COLOR_PANEL_BG));
             let old_brush = SelectObject(hdc, panel_brush);
             let pen = CreatePen(PS_SOLID, scale(2), COLORREF(COLOR_ACCENT));
             let old_pen = SelectObject(hdc, pen);
 
-            let _ = RoundRect(hdc, panel_x, panel_y, panel_x + panel_width, panel_y + panel_height, scale(20), scale(20));
+            let _ = RoundRect(hdc, panel_x, panel_y, panel_x + panel_width, panel_y + panel_height, scale(24), scale(24));
 
             SelectObject(hdc, old_brush);
             SelectObject(hdc, old_pen);
             let _ = DeleteObject(panel_brush);
             let _ = DeleteObject(pen);
 
-            // Title (DPI scaled font, ClearType quality = 5)
+            SetBkMode(hdc, TRANSPARENT);
+
+            // Large icon at top
+            let icon_font = CreateFontW(
+                scale(64), 0, 0, 0,
+                FW_NORMAL.0 as i32,
+                0, 0, 0, 0, 0, 0, 5, 0,
+                w!("Segoe UI Emoji"),
+            );
+            let old_font = SelectObject(hdc, icon_font);
+            SetTextColor(hdc, COLORREF(0x006060FF)); // Orange-red
+            let mut icon_rect = RECT {
+                left: panel_x,
+                top: panel_y + scale(20),
+                right: panel_x + panel_width,
+                bottom: panel_y + scale(90),
+            };
+            DrawTextW(hdc, &mut "⏰".encode_utf16().collect::<Vec<_>>(), &mut icon_rect, DT_CENTER | DT_SINGLELINE);
+
+            // Title
             let title_font = CreateFontW(
-                scale(42), 0, 0, 0,
+                scale(36), 0, 0, 0,
                 FW_BOLD.0 as i32,
                 0, 0, 0, 0, 0, 0, 5, 0,
                 w!("Segoe UI"),
             );
-            let old_font = SelectObject(hdc, title_font);
+            SelectObject(hdc, title_font);
             SetTextColor(hdc, COLORREF(COLOR_TEXT_WHITE));
-            SetBkMode(hdc, TRANSPARENT);
 
             let mut title_rect = RECT {
                 left: panel_x,
-                top: panel_y + scale(25),
+                top: panel_y + scale(90),
                 right: panel_x + panel_width,
-                bottom: panel_y + scale(75),
+                bottom: panel_y + scale(130),
             };
-            let times_up: Vec<u16> = i18n::t("blocking.times_up").encode_utf16().collect();
             DrawTextW(
                 hdc,
-                &mut times_up.clone(),
+                &mut i18n::t("blocking.times_up").encode_utf16().collect::<Vec<_>>(),
                 &mut title_rect,
                 DT_CENTER | DT_SINGLELINE,
             );
 
-            // Shutdown countdown display (DPI scaled font, ClearType quality = 5)
+            // Shutdown countdown
             let shutdown_countdown = SHUTDOWN_COUNTDOWN_SECONDS.load(Ordering::SeqCst);
             let time_font = CreateFontW(
-                scale(36), 0, 0, 0,
+                scale(28), 0, 0, 0,
                 FW_BOLD.0 as i32,
                 0, 0, 0, 0, 0, 0, 5, 0,
                 w!("Segoe UI"),
             );
             SelectObject(hdc, time_font);
 
-            // Show shutdown countdown - red when <= 60 seconds remain
             let time_str = if shutdown_countdown >= 0 {
                 if shutdown_countdown <= 60 {
-                    SetTextColor(hdc, COLORREF(0x0000FF)); // Red (BGR format)
+                    SetTextColor(hdc, COLORREF(0x004040FF)); // Red
                     format!("{} {}s", i18n::t("blocking.shutdown_now"), shutdown_countdown)
                 } else {
                     SetTextColor(hdc, COLORREF(COLOR_ACCENT));
@@ -543,21 +572,15 @@ pub unsafe extern "system" fn blocking_overlay_proc(
             };
             let mut time_rect = RECT {
                 left: panel_x,
-                top: panel_y + scale(80),
+                top: panel_y + scale(135),
                 right: panel_x + panel_width,
-                bottom: panel_y + scale(120),
+                bottom: panel_y + scale(170),
             };
-            let wide_time: Vec<u16> = time_str.encode_utf16().collect();
-            DrawTextW(
-                hdc,
-                &mut wide_time.clone(),
-                &mut time_rect,
-                DT_CENTER | DT_SINGLELINE,
-            );
+            DrawTextW(hdc, &mut time_str.encode_utf16().collect::<Vec<_>>(), &mut time_rect, DT_CENTER | DT_SINGLELINE);
 
-            // Message (DPI scaled font, ClearType quality = 5)
+            // Message
             let msg_font = CreateFontW(
-                scale(20), 0, 0, 0,
+                scale(16), 0, 0, 0,
                 FW_NORMAL.0 as i32,
                 0, 0, 0, 0, 0, 0, 5, 0,
                 w!("Segoe UI"),
@@ -568,35 +591,29 @@ pub unsafe extern "system" fn blocking_overlay_proc(
             let blocking_text_guard = BLOCKING_TEXT.lock().unwrap();
             let message = blocking_text_guard.as_ref().map(|s| s.as_str()).unwrap_or(i18n::t("blocking.limit_reached"));
             let mut msg_rect = RECT {
-                left: panel_x + scale(30),
-                top: panel_y + scale(125),
-                right: panel_x + panel_width - scale(30),
-                bottom: panel_y + scale(160),
+                left: panel_x + scale(20),
+                top: panel_y + scale(175),
+                right: panel_x + panel_width - scale(20),
+                bottom: panel_y + scale(200),
             };
-            let wide_msg: Vec<u16> = message.encode_utf16().collect();
-            DrawTextW(
-                hdc,
-                &mut wide_msg.clone(),
-                &mut msg_rect,
-                DT_CENTER | DT_SINGLELINE,
-            );
+            DrawTextW(hdc, &mut message.encode_utf16().collect::<Vec<_>>(), &mut msg_rect, DT_CENTER | DT_SINGLELINE);
             drop(blocking_text_guard);
 
-            // "Extend time:" label (DPI scaled font, ClearType quality = 5)
+            // "Extend time:" label
             let label_font = CreateFontW(
-                scale(16), 0, 0, 0,
+                scale(14), 0, 0, 0,
                 FW_NORMAL.0 as i32,
                 0, 0, 0, 0, 0, 0, 5, 0,
                 w!("Segoe UI"),
             );
             SelectObject(hdc, label_font);
-            SetTextColor(hdc, COLORREF(COLOR_TEXT_LIGHT));
+            SetTextColor(hdc, COLORREF(0x00AAAAAA));
 
             let mut extend_label_rect = RECT {
                 left: panel_x,
-                top: panel_y + scale(170),
+                top: panel_y + scale(200),
                 right: panel_x + panel_width,
-                bottom: panel_y + scale(190),
+                bottom: panel_y + scale(218),
             };
             DrawTextW(
                 hdc,
@@ -605,12 +622,19 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                 DT_CENTER | DT_SINGLELINE,
             );
 
-            // "Enter passcode to unlock:" label
+            // Separator line before passcode section
+            let sep_pen = CreatePen(PS_SOLID, 1, COLORREF(0x00444444));
+            SelectObject(hdc, sep_pen);
+            let _ = windows::Win32::Graphics::Gdi::MoveToEx(hdc, panel_x + scale(40), panel_y + scale(265), None);
+            let _ = windows::Win32::Graphics::Gdi::LineTo(hdc, panel_x + panel_width - scale(40), panel_y + scale(265));
+            let _ = DeleteObject(sep_pen);
+
+            // "Enter passcode:" label
             let mut passcode_label_rect = RECT {
                 left: panel_x,
-                top: panel_y + scale(260),
+                top: panel_y + scale(275),
                 right: panel_x + panel_width,
-                bottom: panel_y + scale(285),
+                bottom: panel_y + scale(295),
             };
             DrawTextW(
                 hdc,
@@ -619,14 +643,21 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                 DT_CENTER | DT_SINGLELINE,
             );
 
-            // Error message
+            // Error message at the bottom
             if PASSCODE_ERROR.load(Ordering::SeqCst) {
                 SetTextColor(hdc, COLORREF(COLOR_ERROR));
+                let error_font = CreateFontW(
+                    scale(15), 0, 0, 0,
+                    FW_BOLD.0 as i32,
+                    0, 0, 0, 0, 0, 0, 5, 0,
+                    w!("Segoe UI"),
+                );
+                SelectObject(hdc, error_font);
                 let mut error_rect = RECT {
                     left: panel_x,
-                    top: panel_y + panel_height - scale(45),
+                    top: panel_y + panel_height - scale(40),
                     right: panel_x + panel_width,
-                    bottom: panel_y + panel_height - scale(20),
+                    bottom: panel_y + panel_height - scale(15),
                 };
                 DrawTextW(
                     hdc,
@@ -634,13 +665,24 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                     &mut error_rect,
                     DT_CENTER | DT_SINGLELINE,
                 );
+                let _ = DeleteObject(error_font);
             }
 
+            // Cleanup fonts
             SelectObject(hdc, old_font);
+            let _ = DeleteObject(icon_font);
             let _ = DeleteObject(title_font);
             let _ = DeleteObject(time_font);
             let _ = DeleteObject(msg_font);
             let _ = DeleteObject(label_font);
+
+            // Blit from memory DC to screen (no flicker)
+            let _ = BitBlt(hdc_screen, 0, 0, rect.right, rect.bottom, hdc_mem, 0, 0, SRCCOPY);
+
+            // Cleanup double buffer
+            SelectObject(hdc_mem, hbm_old);
+            let _ = DeleteObject(hbm);
+            let _ = DeleteDC(hdc_mem);
 
             let _ = EndPaint(hwnd, &ps);
             LRESULT(0)
@@ -653,6 +695,8 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                 match id {
                     ID_UNLOCK_BUTTON => {
                         if check_blocking_passcode() {
+                            // Add 15 minutes when unlocking (otherwise timer at 0 would re-lock immediately)
+                            extend_time(15);
                             hide_blocking_overlay();
                         } else {
                             PASSCODE_ERROR.store(true, Ordering::SeqCst);
@@ -738,9 +782,25 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                         initiate_shutdown();
                     }
 
-                    // Redraw to update time display
-                    // Use false to avoid erasing background (prevents flickering)
-                    let _ = InvalidateRect(hwnd, None, false);
+                    // Only invalidate the countdown region, not the entire window
+                    // This prevents child controls (buttons, edit) from flickering
+                    let mut client_rect: RECT = zeroed();
+                    GetClientRect(hwnd, &mut client_rect).ok();
+                    let screen_width = client_rect.right;
+                    let screen_height = client_rect.bottom;
+                    let panel_width = scale(480);
+                    let panel_height = scale(520);
+                    let panel_x = (screen_width - panel_width) / 2;
+                    let panel_y = (screen_height - panel_height) / 2;
+
+                    // Countdown region (from panel_y + scale(90) to scale(200) covers title + time + message)
+                    let countdown_rect = RECT {
+                        left: panel_x,
+                        top: panel_y + scale(90),
+                        right: panel_x + panel_width,
+                        bottom: panel_y + scale(200),
+                    };
+                    let _ = InvalidateRect(hwnd, Some(&countdown_rect), false);
                 }
                 _ => {}
             }
@@ -756,6 +816,8 @@ pub unsafe extern "system" fn blocking_overlay_proc(
         WM_KEYDOWN => {
             if wparam.0 == VK_RETURN.0 as usize {
                 if check_blocking_passcode() {
+                    // Add 15 minutes when unlocking (otherwise timer at 0 would re-lock immediately)
+                    extend_time(15);
                     hide_blocking_overlay();
                 } else {
                     PASSCODE_ERROR.store(true, Ordering::SeqCst);
