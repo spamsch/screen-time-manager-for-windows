@@ -91,13 +91,27 @@ if [[ "$NEW_VERSION_CHECK" != "$NEW_VERSION" ]]; then
     exit 1
 fi
 
+# Update version in about dialog (i18n.rs)
+echo -e "${GREEN}Updating about dialog version in i18n.rs...${NC}"
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # English: "Screen Time Manager v1.0.xx"
+    sed -i '' "s/Screen Time Manager v[0-9]*\.[0-9]*\.[0-9]*/Screen Time Manager v${NEW_VERSION}/" src/i18n.rs
+    # German: "Bildschirmzeit Manager v1.0.xx"
+    sed -i '' "s/Bildschirmzeit Manager v[0-9]*\.[0-9]*\.[0-9]*/Bildschirmzeit Manager v${NEW_VERSION}/" src/i18n.rs
+else
+    # English: "Screen Time Manager v1.0.xx"
+    sed -i "s/Screen Time Manager v[0-9]*\.[0-9]*\.[0-9]*/Screen Time Manager v${NEW_VERSION}/" src/i18n.rs
+    # German: "Bildschirmzeit Manager v1.0.xx"
+    sed -i "s/Bildschirmzeit Manager v[0-9]*\.[0-9]*\.[0-9]*/Bildschirmzeit Manager v${NEW_VERSION}/" src/i18n.rs
+fi
+
 # Update Cargo.lock by running cargo check
 echo -e "${GREEN}Updating Cargo.lock...${NC}"
 cargo check --quiet 2>/dev/null || true
 
 # Stage and commit
 echo -e "\n${GREEN}Committing changes...${NC}"
-git add Cargo.toml Cargo.lock
+git add Cargo.toml Cargo.lock src/i18n.rs
 git commit -m "$COMMIT_MSG"
 
 # Create tag
