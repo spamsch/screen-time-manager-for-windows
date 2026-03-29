@@ -77,7 +77,11 @@ ${CHANGELOG}"
 
 # Update version in Cargo.toml
 echo -e "\n${GREEN}Updating Cargo.toml...${NC}"
-sed -i "s/^version = \"${CURRENT_VERSION}\"/version = \"${NEW_VERSION}\"/" Cargo.toml
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    sed -i '' "s/^version = \"${CURRENT_VERSION}\"/version = \"${NEW_VERSION}\"/" Cargo.toml
+else
+    sed -i "s/^version = \"${CURRENT_VERSION}\"/version = \"${NEW_VERSION}\"/" Cargo.toml
+fi
 
 # Verify the change
 NEW_VERSION_CHECK=$(grep -m1 '^version' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
