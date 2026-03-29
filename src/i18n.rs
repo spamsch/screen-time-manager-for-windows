@@ -136,6 +136,7 @@ fn en(key: &str) -> &'static str {
         "settings.enable_telegram" => "Enable Telegram Bot",
         "settings.bot_token" => "Bot Token:",
         "settings.chat_id" => "Chat ID:",
+        "settings.setup_wizard" => "Setup Wizard...",
         "settings.shutdown_timeout" => "Shutdown timeout:",
         "settings.auto_pause_idle" => "Auto-pause when idle",
         "settings.idle_timeout" => "Idle timeout (min):",
@@ -289,6 +290,62 @@ fn en(key: &str) -> &'static str {
         "tg.notify.started" => "Screen Time Manager started",
         "tg.notify.shutdown" => "Screen Time Manager is shutting down",
 
+        // ----- Telegram Setup Wizard -----
+        "wizard.title" => "Telegram Setup Wizard",
+        "wizard.step" => "Step",
+        "wizard.of" => "of",
+        "wizard.next" => "Next",
+        "wizard.back" => "Back",
+        "wizard.finish" => "Finish",
+        "wizard.cancel" => "Cancel",
+        "wizard.skip" => "Skip",
+
+        // Step 1: Welcome
+        "wizard.welcome.title" => "Remote Control via Telegram",
+        "wizard.welcome.desc1" => "Control Screen Time Manager from your phone!",
+        "wizard.welcome.desc2" => "With Telegram you can:",
+        "wizard.welcome.feature1" => "Check remaining time",
+        "wizard.welcome.feature2" => "Extend or reduce time remotely",
+        "wizard.welcome.feature3" => "Lock the screen instantly",
+        "wizard.welcome.feature4" => "Receive notifications",
+        "wizard.welcome.ready" => "Let's set it up in 3 easy steps!",
+
+        // Step 2: Create Bot
+        "wizard.bot.title" => "Create Your Bot",
+        "wizard.bot.step1" => "1. Open Telegram on your phone",
+        "wizard.bot.step2" => "2. Search for  @BotFather",
+        "wizard.bot.step3" => "3. Send the message:  /newbot",
+        "wizard.bot.step4" => "4. Choose a name (e.g. \"My Screen Time\")",
+        "wizard.bot.step5" => "5. Choose a username ending in 'bot'",
+        "wizard.bot.step6" => "6. BotFather will give you a token - copy it!",
+        "wizard.bot.hint" => "The token looks like: 123456789:ABCdef...",
+
+        // Step 3: Enter Token
+        "wizard.token.title" => "Enter Your Bot Token",
+        "wizard.token.label" => "Paste the token from BotFather:",
+        "wizard.token.placeholder" => "123456789:ABCdefGHI...",
+        "wizard.token.invalid" => "This doesn't look like a valid token",
+        "wizard.token.valid" => "Token looks good!",
+
+        // Step 4: Connect
+        "wizard.connect.title" => "Connect to Your Bot",
+        "wizard.connect.step1" => "1. Open Telegram",
+        "wizard.connect.step2" => "2. Search for your new bot",
+        "wizard.connect.step3" => "3. Press START or send any message",
+        "wizard.connect.waiting" => "Waiting for your message...",
+        "wizard.connect.detected" => "Connection detected!",
+        "wizard.connect.chatid" => "Your Chat ID:",
+
+        // Step 5: Success
+        "wizard.success.title" => "Setup Complete!",
+        "wizard.success.desc" => "Your Telegram bot is ready to use.",
+        "wizard.success.test" => "A test message was sent to your phone.",
+        "wizard.success.commands" => "Try these commands in Telegram:",
+        "wizard.success.cmd1" => "/status - Check remaining time",
+        "wizard.success.cmd2" => "/extend 30 - Add 30 minutes",
+        "wizard.success.cmd3" => "/lock - Lock the screen",
+        "wizard.success.cmd4" => "/help - See all commands",
+
         // Fallback - return empty string for unknown keys (should not happen in practice)
         _ => "",
     }
@@ -327,6 +384,7 @@ fn de(key: &str) -> &'static str {
         "settings.enable_telegram" => "Telegram Bot aktivieren",
         "settings.bot_token" => "Bot Token:",
         "settings.chat_id" => "Chat ID:",
+        "settings.setup_wizard" => "Einrichtungsassistent...",
         "settings.shutdown_timeout" => "Abschaltzeit:",
         "settings.auto_pause_idle" => "Auto-Pause bei Leerlauf",
         "settings.idle_timeout" => "Leerlaufzeit (Min):",
@@ -479,6 +537,62 @@ fn de(key: &str) -> &'static str {
 
         "tg.notify.started" => "Bildschirmzeit Manager gestartet",
         "tg.notify.shutdown" => "Bildschirmzeit Manager wird heruntergefahren",
+
+        // ----- Telegram Setup Wizard -----
+        "wizard.title" => "Telegram Einrichtungsassistent",
+        "wizard.step" => "Schritt",
+        "wizard.of" => "von",
+        "wizard.next" => "Weiter",
+        "wizard.back" => "Zurück",
+        "wizard.finish" => "Fertig",
+        "wizard.cancel" => "Abbrechen",
+        "wizard.skip" => "Überspringen",
+
+        // Step 1: Welcome
+        "wizard.welcome.title" => "Fernsteuerung via Telegram",
+        "wizard.welcome.desc1" => "Steuern Sie den Bildschirmzeit Manager vom Handy!",
+        "wizard.welcome.desc2" => "Mit Telegram können Sie:",
+        "wizard.welcome.feature1" => "Verbleibende Zeit prüfen",
+        "wizard.welcome.feature2" => "Zeit ferngesteuert verlängern oder verkürzen",
+        "wizard.welcome.feature3" => "Bildschirm sofort sperren",
+        "wizard.welcome.feature4" => "Benachrichtigungen erhalten",
+        "wizard.welcome.ready" => "Richten wir es in 3 einfachen Schritten ein!",
+
+        // Step 2: Create Bot
+        "wizard.bot.title" => "Erstellen Sie Ihren Bot",
+        "wizard.bot.step1" => "1. Öffnen Sie Telegram auf Ihrem Handy",
+        "wizard.bot.step2" => "2. Suchen Sie nach  @BotFather",
+        "wizard.bot.step3" => "3. Senden Sie die Nachricht:  /newbot",
+        "wizard.bot.step4" => "4. Wählen Sie einen Namen (z.B. \"Meine Bildschirmzeit\")",
+        "wizard.bot.step5" => "5. Wählen Sie einen Benutzernamen mit 'bot' am Ende",
+        "wizard.bot.step6" => "6. BotFather gibt Ihnen einen Token - kopieren Sie ihn!",
+        "wizard.bot.hint" => "Der Token sieht so aus: 123456789:ABCdef...",
+
+        // Step 3: Enter Token
+        "wizard.token.title" => "Bot-Token eingeben",
+        "wizard.token.label" => "Fügen Sie den Token von BotFather ein:",
+        "wizard.token.placeholder" => "123456789:ABCdefGHI...",
+        "wizard.token.invalid" => "Das sieht nicht wie ein gültiger Token aus",
+        "wizard.token.valid" => "Token sieht gut aus!",
+
+        // Step 4: Connect
+        "wizard.connect.title" => "Mit Ihrem Bot verbinden",
+        "wizard.connect.step1" => "1. Öffnen Sie Telegram",
+        "wizard.connect.step2" => "2. Suchen Sie nach Ihrem neuen Bot",
+        "wizard.connect.step3" => "3. Drücken Sie START oder senden Sie eine Nachricht",
+        "wizard.connect.waiting" => "Warte auf Ihre Nachricht...",
+        "wizard.connect.detected" => "Verbindung erkannt!",
+        "wizard.connect.chatid" => "Ihre Chat-ID:",
+
+        // Step 5: Success
+        "wizard.success.title" => "Einrichtung abgeschlossen!",
+        "wizard.success.desc" => "Ihr Telegram-Bot ist einsatzbereit.",
+        "wizard.success.test" => "Eine Testnachricht wurde an Ihr Handy gesendet.",
+        "wizard.success.commands" => "Probieren Sie diese Befehle in Telegram:",
+        "wizard.success.cmd1" => "/status - Verbleibende Zeit prüfen",
+        "wizard.success.cmd2" => "/extend 30 - 30 Minuten hinzufügen",
+        "wizard.success.cmd3" => "/lock - Bildschirm sperren",
+        "wizard.success.cmd4" => "/help - Alle Befehle anzeigen",
 
         // Fallback to English
         _ => en(key),

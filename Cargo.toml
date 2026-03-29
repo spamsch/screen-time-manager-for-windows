@@ -36,6 +36,10 @@ dirs = "5.0"
 teloxide = { version = "0.13", features = ["macros"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
 
+# HTTP client for wizard
+ureq = "2.9"
+urlencoding = "2.1"
+
 [build-dependencies]
 embed-resource = "2.4"
 
