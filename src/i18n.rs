@@ -211,7 +211,7 @@ fn en(key: &str) -> &'static str {
         "blocking.screen_locked" => "Screen Locked",
 
         // ----- About Dialog -----
-        "about.text" => "Screen Time Manager v1.0.38\n\nA parental control application for managing screen time.\n\n(c) Simon Pamies",
+        "about.text" => "Screen Time Manager v1.0.39\n\nA parental control application for managing screen time.\n\n(c) Simon Pamies",
 
         // ----- Pause Reasons -----
         "pause.disabled" => "Pause feature is disabled",
@@ -459,7 +459,7 @@ fn de(key: &str) -> &'static str {
         "blocking.screen_locked" => "Bildschirm gesperrt",
 
         // ----- About Dialog -----
-        "about.text" => "Bildschirmzeit Manager v1.0.38\n\nEine Kindersicherungs-App zur Verwaltung der Bildschirmzeit.\n\n(c) Simon Pamies",
+        "about.text" => "Bildschirmzeit Manager v1.0.39\n\nEine Kindersicherungs-App zur Verwaltung der Bildschirmzeit.\n\n(c) Simon Pamies",
 
         // ----- Pause Reasons -----
         "pause.disabled" => "Pause-Funktion ist deaktiviert",
