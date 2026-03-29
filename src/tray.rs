@@ -3,7 +3,7 @@
 
 use std::mem::zeroed;
 use windows::{
-    core::{w, PCWSTR},
+    core::PCWSTR,
     Win32::{
         Foundation::{HWND, LPARAM, LRESULT, WPARAM},
         System::LibraryLoader::GetModuleHandleW,
@@ -21,6 +21,7 @@ use crate::blocking::{extend_time, hide_blocking_overlay, show_blocking_overlay,
 use crate::constants::*;
 use crate::database::{get_blocking_message, get_warning_config, is_pause_enabled};
 use crate::dialogs::{show_settings_dialog, show_stats_dialog, verify_passcode_for_quit};
+use crate::i18n;
 use crate::mini_overlay::{is_paused, is_idle_paused, can_pause, toggle_pause, PauseBlockedReason, get_remaining_pause_budget};
 use crate::overlay::{show_overlay, OVERLAY_HWND};
 use crate::telegram;
@@ -37,7 +38,7 @@ pub unsafe fn add_tray_icon(hwnd: HWND) {
         .or_else(|_| LoadIconW(None, IDI_APPLICATION))
         .expect("Failed to load icon");
 
-    let tooltip = "Screen Time Manager";
+    let tooltip = i18n::t("tray.tooltip");
     let mut tip_buffer: [u16; 128] = [0; 128];
     for (i, c) in tooltip.encode_utf16().enumerate() {
         if i >= 127 { break; }
@@ -78,13 +79,13 @@ pub unsafe fn show_context_menu(hwnd: HWND) {
 
     let (pause_text, pause_flags) = if paused {
         // Currently manually paused - show resume option (always available)
-        ("Resume Timer", MF_BYPOSITION | MF_STRING)
+        (i18n::t("tray.resume"), MF_BYPOSITION | MF_STRING)
     } else if is_idle_paused() {
         // Currently idle-paused - grey out manual pause (already paused via idle)
-        ("Pause (Idle paused)", MF_BYPOSITION | MF_STRING | MF_GRAYED)
+        (i18n::t("tray.pause_idle"), MF_BYPOSITION | MF_STRING | MF_GRAYED)
     } else if !pause_enabled {
         // Pause feature disabled
-        ("Pause (Disabled)", MF_BYPOSITION | MF_STRING | MF_GRAYED)
+        (i18n::t("tray.pause_disabled"), MF_BYPOSITION | MF_STRING | MF_GRAYED)
     } else {
         // Check if pause is available
         match can_pause() {
@@ -98,7 +99,7 @@ pub unsafe fn show_context_menu(hwnd: HWND) {
                 return show_context_menu_with_pause(hwnd, hmenu, PCWSTR(ptr), MF_BYPOSITION | MF_STRING);
             }
             Err(PauseBlockedReason::BudgetExhausted) => {
-                ("Pause (Budget used)", MF_BYPOSITION | MF_STRING | MF_GRAYED)
+                (i18n::t("tray.pause_budget_used"), MF_BYPOSITION | MF_STRING | MF_GRAYED)
             }
             Err(PauseBlockedReason::CooldownActive { seconds_remaining }) => {
                 let mins = (seconds_remaining + 59) / 60; // Round up
@@ -117,10 +118,10 @@ pub unsafe fn show_context_menu(hwnd: HWND) {
                 return show_context_menu_with_pause(hwnd, hmenu, PCWSTR(ptr), MF_BYPOSITION | MF_STRING | MF_GRAYED);
             }
             Err(PauseBlockedReason::TimeTooLow) => {
-                ("Pause (Time too low)", MF_BYPOSITION | MF_STRING | MF_GRAYED)
+                (i18n::t("tray.pause_time_low"), MF_BYPOSITION | MF_STRING | MF_GRAYED)
             }
             Err(PauseBlockedReason::Disabled) => {
-                ("Pause (Disabled)", MF_BYPOSITION | MF_STRING | MF_GRAYED)
+                (i18n::t("tray.pause_disabled"), MF_BYPOSITION | MF_STRING | MF_GRAYED)
             }
         }
     };
@@ -131,15 +132,19 @@ pub unsafe fn show_context_menu(hwnd: HWND) {
 
 /// Helper to show context menu with pause item
 unsafe fn show_context_menu_with_pause(hwnd: HWND, hmenu: HMENU, pause_text: PCWSTR, pause_flags: MENU_ITEM_FLAGS) {
-    InsertMenuW(hmenu, 0, MF_BYPOSITION | MF_STRING, IDM_TODAYS_STATS as usize, w!("Today's Stats..."))
+    let stats_text = i18n::wide("tray.stats");
+    InsertMenuW(hmenu, 0, MF_BYPOSITION | MF_STRING, IDM_TODAYS_STATS as usize, PCWSTR(stats_text.as_ptr()))
         .expect("Failed to insert menu item");
-    InsertMenuW(hmenu, 1, MF_BYPOSITION | MF_STRING, IDM_SETTINGS as usize, w!("Settings..."))
+    let settings_text = i18n::wide("tray.settings");
+    InsertMenuW(hmenu, 1, MF_BYPOSITION | MF_STRING, IDM_SETTINGS as usize, PCWSTR(settings_text.as_ptr()))
         .expect("Failed to insert menu item");
     InsertMenuW(hmenu, 2, MF_BYPOSITION | MF_SEPARATOR, 0, PCWSTR::null())
         .expect("Failed to insert separator");
-    InsertMenuW(hmenu, 3, MF_BYPOSITION | MF_STRING, IDM_EXTEND_15 as usize, w!("Extend +15 min"))
+    let extend15_text = i18n::wide("tray.extend_15");
+    InsertMenuW(hmenu, 3, MF_BYPOSITION | MF_STRING, IDM_EXTEND_15 as usize, PCWSTR(extend15_text.as_ptr()))
         .expect("Failed to insert menu item");
-    InsertMenuW(hmenu, 4, MF_BYPOSITION | MF_STRING, IDM_EXTEND_45 as usize, w!("Extend +45 min"))
+    let extend45_text = i18n::wide("tray.extend_45");
+    InsertMenuW(hmenu, 4, MF_BYPOSITION | MF_STRING, IDM_EXTEND_45 as usize, PCWSTR(extend45_text.as_ptr()))
         .expect("Failed to insert menu item");
     InsertMenuW(hmenu, 5, MF_BYPOSITION | MF_SEPARATOR, 0, PCWSTR::null())
         .expect("Failed to insert separator");
@@ -152,7 +157,8 @@ unsafe fn show_context_menu_with_pause(hwnd: HWND, hmenu: HMENU, pause_text: PCW
 
     // Show idle status if idle-paused
     if is_idle_paused() {
-        InsertMenuW(hmenu, idx, MF_BYPOSITION | MF_STRING | MF_GRAYED, 0, w!("Idle: Paused"))
+        let idle_text = i18n::wide("tray.idle_paused");
+        InsertMenuW(hmenu, idx, MF_BYPOSITION | MF_STRING | MF_GRAYED, 0, PCWSTR(idle_text.as_ptr()))
             .expect("Failed to insert idle status");
         idx += 1;
     }
@@ -160,19 +166,23 @@ unsafe fn show_context_menu_with_pause(hwnd: HWND, hmenu: HMENU, pause_text: PCW
     InsertMenuW(hmenu, idx, MF_BYPOSITION | MF_SEPARATOR, 0, PCWSTR::null())
         .expect("Failed to insert separator");
     idx += 1;
-    InsertMenuW(hmenu, idx, MF_BYPOSITION | MF_STRING, IDM_SHOW_OVERLAY as usize, w!("Show Warning (5s)"))
+    let warning_text = i18n::wide("tray.show_warning");
+    InsertMenuW(hmenu, idx, MF_BYPOSITION | MF_STRING, IDM_SHOW_OVERLAY as usize, PCWSTR(warning_text.as_ptr()))
         .expect("Failed to insert menu item");
     idx += 1;
-    InsertMenuW(hmenu, idx, MF_BYPOSITION | MF_STRING, IDM_SHOW_BLOCKING as usize, w!("Show Blocking Overlay"))
+    let blocking_text = i18n::wide("tray.show_blocking");
+    InsertMenuW(hmenu, idx, MF_BYPOSITION | MF_STRING, IDM_SHOW_BLOCKING as usize, PCWSTR(blocking_text.as_ptr()))
         .expect("Failed to insert menu item");
     idx += 1;
     InsertMenuW(hmenu, idx, MF_BYPOSITION | MF_SEPARATOR, 0, PCWSTR::null())
         .expect("Failed to insert separator");
     idx += 1;
-    InsertMenuW(hmenu, idx, MF_BYPOSITION | MF_STRING, IDM_ABOUT as usize, w!("About"))
+    let about_text = i18n::wide("tray.about");
+    InsertMenuW(hmenu, idx, MF_BYPOSITION | MF_STRING, IDM_ABOUT as usize, PCWSTR(about_text.as_ptr()))
         .expect("Failed to insert menu item");
     idx += 1;
-    InsertMenuW(hmenu, idx, MF_BYPOSITION | MF_STRING, IDM_QUIT as usize, w!("Quit"))
+    let quit_text = i18n::wide("tray.quit");
+    InsertMenuW(hmenu, idx, MF_BYPOSITION | MF_STRING, IDM_QUIT as usize, PCWSTR(quit_text.as_ptr()))
         .expect("Failed to insert menu item");
 
     let mut point = zeroed();
@@ -255,10 +265,12 @@ pub unsafe extern "system" fn window_proc(
                     }
                 }
                 IDM_ABOUT => {
+                    let about_msg = i18n::wide("about.text");
+                    let about_title = i18n::wide("window.about");
                     MessageBoxW(
                         hwnd,
-                        w!("Screen Time Manager v0.1.0\n\nA parental control application for managing screen time."),
-                        w!("About"),
+                        PCWSTR(about_msg.as_ptr()),
+                        PCWSTR(about_title.as_ptr()),
                         MB_OK | MB_ICONINFORMATION,
                     );
                 }

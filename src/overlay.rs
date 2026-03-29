@@ -121,7 +121,7 @@ pub unsafe extern "system" fn overlay_window_proc(
                 let hfont = CreateFontW(
                     scale(72), 0, 0, 0,
                     FW_BOLD.0 as i32,
-                    0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 5, 0,
                     w!("Segoe UI"),
                 );
 

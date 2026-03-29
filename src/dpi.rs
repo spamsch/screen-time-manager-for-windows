@@ -30,19 +30,9 @@ pub fn get_dpi() -> u32 {
     }
 }
 
-/// Get the scale factor as a ratio (1.0 = 100%, 1.5 = 150%, etc.)
-pub fn get_scale_factor() -> f32 {
-    get_dpi() as f32 / STANDARD_DPI as f32
-}
-
 /// Scale an integer value by the DPI factor
 pub fn scale(value: i32) -> i32 {
     let dpi = get_dpi();
     // Use MulDiv-style calculation to avoid floating point
     ((value as i64 * dpi as i64 + STANDARD_DPI as i64 / 2) / STANDARD_DPI as i64) as i32
-}
-
-/// Scale a font size (similar to scale but for font heights)
-pub fn scale_font(size: i32) -> i32 {
-    scale(size)
 }

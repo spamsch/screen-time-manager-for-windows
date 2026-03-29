@@ -9,6 +9,7 @@ use teloxide::utils::command::BotCommands;
 
 use crate::blocking;
 use crate::database;
+use crate::i18n;
 use crate::mini_overlay;
 use crate::overlay;
 
@@ -105,7 +106,7 @@ pub fn signal_shutdown() {
             let rt = tokio::runtime::Runtime::new().ok();
             if let Some(rt) = rt {
                 rt.block_on(async {
-                    let _ = bot.send_message(ChatId(chat_id), "Screen Time Manager is shutting down").await;
+                    let _ = bot.send_message(ChatId(chat_id), i18n::t("tg.notify.shutdown")).await;
                 });
             }
         });
@@ -123,7 +124,7 @@ async fn run_bot(token: String, admin_chat_id: Option<i64>) {
 
     // Send startup notification
     if let Some(chat_id) = admin_chat_id {
-        let _ = bot.send_message(ChatId(chat_id), "Screen Time Manager started").await;
+        let _ = bot.send_message(ChatId(chat_id), i18n::t("tg.notify.started")).await;
     }
 
     // Command handler
@@ -140,7 +141,7 @@ async fn run_bot(token: String, admin_chat_id: Option<i64>) {
                 if text.starts_with('/') {
                     bot.send_message(
                         msg.chat.id,
-                        format!("Unknown command: {}\nUse /help to see available commands.", text)
+                        i18n::t("tg.error.unknown_cmd")
                     ).await?;
                 } else if !text.is_empty() {
                     // Check authorization
@@ -153,7 +154,7 @@ async fn run_bot(token: String, admin_chat_id: Option<i64>) {
                         }
                         bot.send_message(
                             msg.chat.id,
-                            format!("📢 Message shown: \"{}\"", text)
+                            format!("📢 {}: \"{}\"", i18n::t("tg.msg.shown"), text)
                         ).await?;
                     }
                 }
@@ -211,7 +212,7 @@ async fn handle_command(
             return Ok(());
         }
         Command::Chatid => {
-            bot.send_message(msg.chat.id, format!("Your chat ID is: {}", sender_id)).await?;
+            bot.send_message(msg.chat.id, format!("{} {}", i18n::t("tg.chatid.your_id"), sender_id)).await?;
             return Ok(());
         }
         _ => {}
@@ -220,12 +221,12 @@ async fn handle_command(
     // Authorization check for all other commands
     if let Some(admin_id) = admin_chat_id {
         if sender_id != admin_id {
-            bot.send_message(msg.chat.id, "Unauthorized. This bot is configured for a specific user.").await?;
+            bot.send_message(msg.chat.id, i18n::t("tg.error.unauthorized")).await?;
             return Ok(());
         }
     } else {
         // No admin configured - reject all commands except /start and /chatid
-        bot.send_message(msg.chat.id, "No admin configured. Please set your chat ID in settings.").await?;
+        bot.send_message(msg.chat.id, i18n::t("tg.error.no_admin")).await?;
         return Ok(());
     }
 
@@ -275,22 +276,26 @@ fn cmd_status() -> String {
     };
 
     let pause_status = if paused {
-        "Yes (manual)"
+        i18n::t("tg.status.yes")
     } else if idle_paused {
-        "Yes (idle)"
+        i18n::t("tg.status.idle")
     } else {
-        "No"
+        i18n::t("tg.status.no")
     };
 
     format!(
-        "Screen Time Status\n\
+        "{}\n\
          ━━━━━━━━━━━━━━━━━━\n\
-         {} Remaining: {}:{:02}\n\
-         ⏸ Paused: {}\n\
-         🔋 Pause budget: {} min",
+         {} {}: {}:{:02}\n\
+         ⏸ {}: {}\n\
+         🔋 {}: {} min",
+        i18n::t("tg.status.header"),
         status_emoji,
+        i18n::t("tg.status.remaining"),
         mins, secs,
+        i18n::t("tg.status.paused"),
         pause_status,
+        i18n::t("tg.status.pause_budget"),
         pause_budget / 60
     )
 }
@@ -313,10 +318,10 @@ fn cmd_time() -> String {
 
 fn cmd_extend(minutes: i32) -> String {
     if minutes <= 0 {
-        return "Please specify a positive number of minutes".to_string();
+        return i18n::t("tg.extend.specify_positive").to_string();
     }
     if minutes > 120 {
-        return "Maximum extension is 120 minutes".to_string();
+        return i18n::t("tg.extend.max_120").to_string();
     }
 
     blocking::extend_time(minutes);
@@ -331,23 +336,28 @@ fn cmd_extend(minutes: i32) -> String {
     let new_mins = remaining / 60;
     let new_secs = remaining % 60;
 
-    format!("✅ Extended by {} minutes\nNew remaining: {}:{:02}", minutes, new_mins, new_secs)
+    format!("✅ {} {} min\n{} {}:{:02}",
+        i18n::t("tg.extend.success").replace("{}", ""),
+        minutes,
+        i18n::t("tg.status.remaining"),
+        new_mins, new_secs)
 }
 
 fn cmd_reduce(minutes: i32) -> String {
     if minutes <= 0 {
-        return "Please specify a positive number of minutes".to_string();
+        return i18n::t("tg.reduce.specify_positive").to_string();
     }
     if minutes > 120 {
-        return "Maximum reduction is 120 minutes".to_string();
+        return i18n::t("tg.reduce.max_120").to_string();
     }
 
     let current = blocking::get_remaining_seconds();
     let reduction_seconds = minutes * 60;
 
     if reduction_seconds >= current {
-        return format!("Cannot reduce by {} minutes - only {}:{:02} remaining",
-            minutes, current / 60, current % 60);
+        return format!("{} ({}:{:02})",
+            i18n::t("tg.reduce.not_enough"),
+            current / 60, current % 60);
     }
 
     blocking::reduce_time(minutes);
@@ -357,36 +367,40 @@ fn cmd_reduce(minutes: i32) -> String {
     let new_mins = remaining / 60;
     let new_secs = remaining % 60;
 
-    format!("⏬ Reduced by {} minutes\nNew remaining: {}:{:02}", minutes, new_mins, new_secs)
+    format!("⏬ {} {} min\n{} {}:{:02}",
+        i18n::t("tg.reduce.success").replace("{}", ""),
+        minutes,
+        i18n::t("tg.status.remaining"),
+        new_mins, new_secs)
 }
 
 fn cmd_pause() -> String {
     if mini_overlay::is_paused() {
-        return "⏸ Timer is already paused. Use /resume to continue.".to_string();
+        return format!("⏸ {}", i18n::t("tg.pause.already_paused"));
     }
     if mini_overlay::is_idle_paused() {
-        return "⏸ Timer is already paused (idle). It will resume automatically when input is detected.".to_string();
+        return format!("⏸ {}", i18n::t("tg.pause.idle_paused"));
     }
 
     match mini_overlay::toggle_pause() {
-        Ok(true) => "⏸ Timer paused".to_string(),
-        Ok(false) => "Timer was not paused (unexpected state)".to_string(),
-        Err(reason) => format!("Cannot pause: {}", format_pause_reason(reason)),
+        Ok(true) => format!("⏸ {}", i18n::t("tg.pause.success")),
+        Ok(false) => i18n::t("tg.pause.failed").to_string(),
+        Err(reason) => format!("{} {}", i18n::t("tg.pause.cannot"), format_pause_reason(reason)),
     }
 }
 
 fn cmd_resume() -> String {
     if mini_overlay::is_idle_paused() {
-        return "▶️ Timer is idle-paused. It will resume automatically when input is detected.".to_string();
+        return format!("▶️ {}", i18n::t("tg.resume.idle_auto"));
     }
     if !mini_overlay::is_paused() {
-        return "▶️ Timer is not paused".to_string();
+        return format!("▶️ {}", i18n::t("tg.resume.not_paused"));
     }
 
     match mini_overlay::toggle_pause() {
-        Ok(false) => "▶️ Timer resumed".to_string(),
-        Ok(true) => "Timer is still paused (unexpected state)".to_string(),
-        Err(reason) => format!("Cannot resume: {}", format_pause_reason(reason)),
+        Ok(false) => format!("▶️ {}", i18n::t("tg.resume.success")),
+        Ok(true) => i18n::t("tg.resume.failed").to_string(),
+        Err(reason) => format!("{} {}", i18n::t("tg.resume.cannot"), format_pause_reason(reason)),
     }
 }
 
@@ -398,28 +412,29 @@ fn cmd_history() -> String {
     let pause_config = database::get_pause_config();
     let session_active = mini_overlay::SESSION_ACTIVE_SECONDS.load(Ordering::SeqCst);
 
-    let mut response = String::from("📊 Today's Activity\n━━━━━━━━━━━━━━━━━━\n");
+    let mut response = format!("📊 {}\n━━━━━━━━━━━━━━━━━━\n", i18n::t("tg.history.header"));
 
     // Format uptime
     let hours = session_active / 3600;
     let minutes = (session_active % 3600) / 60;
     let seconds = session_active % 60;
     if hours > 0 {
-        response.push_str(&format!("⏱ Uptime: {}h {}m {}s\n", hours, minutes, seconds));
+        response.push_str(&format!("⏱ {} {}h {}m {}s\n", i18n::t("tg.history.uptime"), hours, minutes, seconds));
     } else {
-        response.push_str(&format!("⏱ Uptime: {}m {}s\n", minutes, seconds));
+        response.push_str(&format!("⏱ {} {}m {}s\n", i18n::t("tg.history.uptime"), minutes, seconds));
     }
 
     response.push_str(&format!(
-        "⏸ Pause used: {} / {} min\n\n",
+        "⏸ {} {} / {} min\n\n",
+        i18n::t("tg.history.pause_used"),
         pause_used / 60,
         pause_config.daily_budget_minutes
     ));
 
     if log.is_empty() {
-        response.push_str("No pause events today");
+        response.push_str(i18n::t("tg.history.no_events"));
     } else {
-        response.push_str("Pause log:\n");
+        response.push_str(&format!("{}:\n", i18n::t("stats.log")));
         for entry in log {
             response.push_str(&format!("• {}\n", entry));
         }
@@ -430,14 +445,14 @@ fn cmd_history() -> String {
 
 fn cmd_msg(text: &str) -> String {
     if text.is_empty() {
-        return "Please provide a message, e.g. /msg Do your homework!".to_string();
+        return i18n::t("tg.msg.provide").to_string();
     }
 
     unsafe {
         overlay::show_overlay(text, 10);
     }
 
-    format!("📢 Message shown: \"{}\"", text)
+    format!("📢 {}: \"{}\"", i18n::t("tg.msg.shown"), text)
 }
 
 fn cmd_reset() -> String {
@@ -455,8 +470,10 @@ fn cmd_reset() -> String {
     }
 
     format!(
-        "🔄 Timer reset to daily limit ({} min)\nRemaining: {}:{:02}",
+        "🔄 {} ({} min)\n{} {}:{:02}",
+        i18n::t("tg.reset.success"),
         daily_limit_minutes,
+        i18n::t("tg.reset.remaining"),
         daily_limit_seconds / 60,
         daily_limit_seconds % 60
     )
@@ -469,20 +486,20 @@ fn cmd_lock() -> String {
         blocking::show_blocking_overlay(&message);
     }
 
-    "🔒 Screen locked".to_string()
+    format!("🔒 {}", i18n::t("tg.lock.success"))
 }
 
 /// Format pause blocked reason for display
 fn format_pause_reason(reason: mini_overlay::PauseBlockedReason) -> String {
     match reason {
-        mini_overlay::PauseBlockedReason::Disabled => "Pause feature is disabled".to_string(),
-        mini_overlay::PauseBlockedReason::BudgetExhausted => "Daily pause budget exhausted".to_string(),
+        mini_overlay::PauseBlockedReason::Disabled => i18n::t("pause.disabled").to_string(),
+        mini_overlay::PauseBlockedReason::BudgetExhausted => i18n::t("pause.budget_exhausted").to_string(),
         mini_overlay::PauseBlockedReason::CooldownActive { seconds_remaining } => {
-            format!("Cooldown active ({} seconds remaining)", seconds_remaining)
+            format!("{} ({}s)", i18n::t("pause.cooldown"), seconds_remaining)
         }
         mini_overlay::PauseBlockedReason::MinActiveTimeNotMet { seconds_remaining } => {
-            format!("Need {} more seconds of active time", seconds_remaining)
+            format!("{} ({}s)", i18n::t("pause.min_active"), seconds_remaining)
         }
-        mini_overlay::PauseBlockedReason::TimeTooLow => "Time is too low to pause".to_string(),
+        mini_overlay::PauseBlockedReason::TimeTooLow => i18n::t("pause.time_too_low").to_string(),
     }
 }

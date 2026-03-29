@@ -30,9 +30,12 @@ use windows::{
     },
 };
 
+use windows::core::PCWSTR;
+
 use crate::constants::*;
 use crate::database::get_passcode;
 use crate::dpi::scale;
+use crate::i18n;
 
 /// Initiates a Windows shutdown with proper privilege handling
 unsafe fn initiate_shutdown() -> bool {
@@ -119,10 +122,11 @@ pub unsafe fn create_blocking_overlay(hinstance: windows::Win32::Foundation::HMO
 
     let ex_style = WS_EX_TOPMOST | WS_EX_TOOLWINDOW;
 
+    let window_title = i18n::wide("window.blocking");
     let hwnd = CreateWindowExW(
         ex_style,
         class_name,
-        w!("Screen Time - Time's Up!"),
+        PCWSTR(window_title.as_ptr()),
         WS_POPUP,
         0,
         0,
@@ -301,11 +305,11 @@ pub unsafe extern "system" fn blocking_overlay_proc(
             let _panel_x = (screen_width - panel_width) / 2;
             let panel_y = (screen_height - panel_height) / 2;
 
-            // Button font for extend buttons (DPI scaled)
+            // Button font for extend buttons (DPI scaled, ClearType quality = 5)
             let btn_font = CreateFontW(
                 scale(18), 0, 0, 0,
                 FW_BOLD.0 as i32,
-                0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 5, 0,
                 w!("Segoe UI"),
             );
 
@@ -318,10 +322,11 @@ pub unsafe extern "system" fn blocking_overlay_proc(
             let extend_start_x = (screen_width - total_extend_width) / 2;
 
             // +15 min button
+            let btn_15_text = i18n::wide("blocking.extend_15");
             let btn_15 = CreateWindowExW(
                 WINDOW_EX_STYLE(0),
                 w!("BUTTON"),
-                w!("+15 min"),
+                PCWSTR(btn_15_text.as_ptr()),
                 WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_PUSHBUTTON as u32),
                 extend_start_x,
                 extend_y,
@@ -337,10 +342,11 @@ pub unsafe extern "system" fn blocking_overlay_proc(
             }
 
             // +30 min button
+            let btn_30_text = i18n::wide("blocking.extend_30");
             let btn_30 = CreateWindowExW(
                 WINDOW_EX_STYLE(0),
                 w!("BUTTON"),
-                w!("+30 min"),
+                PCWSTR(btn_30_text.as_ptr()),
                 WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_PUSHBUTTON as u32),
                 extend_start_x + extend_btn_width + extend_spacing,
                 extend_y,
@@ -356,10 +362,11 @@ pub unsafe extern "system" fn blocking_overlay_proc(
             }
 
             // +60 min button
+            let btn_60_text = i18n::wide("blocking.extend_60");
             let btn_60 = CreateWindowExW(
                 WINDOW_EX_STYLE(0),
                 w!("BUTTON"),
-                w!("+60 min"),
+                PCWSTR(btn_60_text.as_ptr()),
                 WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_PUSHBUTTON as u32),
                 extend_start_x + (extend_btn_width + extend_spacing) * 2,
                 extend_y,
@@ -403,7 +410,7 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                 let hfont = CreateFontW(
                     scale(32), 0, 0, 0,
                     FW_BOLD.0 as i32,
-                    0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 5, 0,
                     w!("Segoe UI"),
                 );
                 SendMessageW(e, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
@@ -415,10 +422,11 @@ pub unsafe extern "system" fn blocking_overlay_proc(
             let btn_x = (screen_width - btn_width) / 2;
             let btn_y = edit_y + edit_height + scale(15);
 
+            let unlock_text = i18n::wide("blocking.unlock");
             let _ = CreateWindowExW(
                 WINDOW_EX_STYLE(0),
                 w!("BUTTON"),
-                w!("Unlock"),
+                PCWSTR(unlock_text.as_ptr()),
                 WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_PUSHBUTTON as u32),
                 btn_x,
                 btn_y,
@@ -432,10 +440,11 @@ pub unsafe extern "system" fn blocking_overlay_proc(
 
             // Shutdown button (DPI scaled)
             let shutdown_btn_y = btn_y + btn_height + scale(15);
+            let shutdown_text = i18n::wide("blocking.shutdown");
             let shutdown_btn = CreateWindowExW(
                 WINDOW_EX_STYLE(0),
                 w!("BUTTON"),
-                w!("Shut Down"),
+                PCWSTR(shutdown_text.as_ptr()),
                 WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_PUSHBUTTON as u32),
                 btn_x,
                 shutdown_btn_y,
@@ -484,11 +493,11 @@ pub unsafe extern "system" fn blocking_overlay_proc(
             let _ = DeleteObject(panel_brush);
             let _ = DeleteObject(pen);
 
-            // Title (DPI scaled font)
+            // Title (DPI scaled font, ClearType quality = 5)
             let title_font = CreateFontW(
                 scale(42), 0, 0, 0,
                 FW_BOLD.0 as i32,
-                0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 5, 0,
                 w!("Segoe UI"),
             );
             let old_font = SelectObject(hdc, title_font);
@@ -501,19 +510,20 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                 right: panel_x + panel_width,
                 bottom: panel_y + scale(75),
             };
+            let times_up: Vec<u16> = i18n::t("blocking.times_up").encode_utf16().collect();
             DrawTextW(
                 hdc,
-                &mut "Time's Up!".encode_utf16().collect::<Vec<_>>(),
+                &mut times_up.clone(),
                 &mut title_rect,
                 DT_CENTER | DT_SINGLELINE,
             );
 
-            // Shutdown countdown display (DPI scaled font)
+            // Shutdown countdown display (DPI scaled font, ClearType quality = 5)
             let shutdown_countdown = SHUTDOWN_COUNTDOWN_SECONDS.load(Ordering::SeqCst);
             let time_font = CreateFontW(
                 scale(36), 0, 0, 0,
                 FW_BOLD.0 as i32,
-                0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 5, 0,
                 w!("Segoe UI"),
             );
             SelectObject(hdc, time_font);
@@ -522,14 +532,14 @@ pub unsafe extern "system" fn blocking_overlay_proc(
             let time_str = if shutdown_countdown >= 0 {
                 if shutdown_countdown <= 60 {
                     SetTextColor(hdc, COLORREF(0x0000FF)); // Red (BGR format)
-                    format!("SHUTDOWN IN: {}s", shutdown_countdown)
+                    format!("{} {}s", i18n::t("blocking.shutdown_now"), shutdown_countdown)
                 } else {
                     SetTextColor(hdc, COLORREF(COLOR_ACCENT));
-                    format!("Shutdown in: {}", format_time(shutdown_countdown))
+                    format!("{} {}", i18n::t("blocking.shutdown_in"), format_time(shutdown_countdown))
                 }
             } else {
                 SetTextColor(hdc, COLORREF(COLOR_ACCENT));
-                String::from("Time limit exceeded")
+                i18n::t("blocking.time_exceeded").to_string()
             };
             let mut time_rect = RECT {
                 left: panel_x,
@@ -545,18 +555,18 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                 DT_CENTER | DT_SINGLELINE,
             );
 
-            // Message (DPI scaled font)
+            // Message (DPI scaled font, ClearType quality = 5)
             let msg_font = CreateFontW(
                 scale(20), 0, 0, 0,
                 FW_NORMAL.0 as i32,
-                0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 5, 0,
                 w!("Segoe UI"),
             );
             SelectObject(hdc, msg_font);
             SetTextColor(hdc, COLORREF(COLOR_TEXT_LIGHT));
 
             let blocking_text_guard = BLOCKING_TEXT.lock().unwrap();
-            let message = blocking_text_guard.as_ref().map(|s| s.as_str()).unwrap_or("Screen time limit reached");
+            let message = blocking_text_guard.as_ref().map(|s| s.as_str()).unwrap_or(i18n::t("blocking.limit_reached"));
             let mut msg_rect = RECT {
                 left: panel_x + scale(30),
                 top: panel_y + scale(125),
@@ -572,11 +582,11 @@ pub unsafe extern "system" fn blocking_overlay_proc(
             );
             drop(blocking_text_guard);
 
-            // "Extend time:" label (DPI scaled font)
+            // "Extend time:" label (DPI scaled font, ClearType quality = 5)
             let label_font = CreateFontW(
                 scale(16), 0, 0, 0,
                 FW_NORMAL.0 as i32,
-                0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 5, 0,
                 w!("Segoe UI"),
             );
             SelectObject(hdc, label_font);
@@ -590,7 +600,7 @@ pub unsafe extern "system" fn blocking_overlay_proc(
             };
             DrawTextW(
                 hdc,
-                &mut "Extend time (requires passcode):".encode_utf16().collect::<Vec<_>>(),
+                &mut i18n::t("blocking.extend_label").encode_utf16().collect::<Vec<_>>(),
                 &mut extend_label_rect,
                 DT_CENTER | DT_SINGLELINE,
             );
@@ -604,7 +614,7 @@ pub unsafe extern "system" fn blocking_overlay_proc(
             };
             DrawTextW(
                 hdc,
-                &mut "Enter passcode to unlock:".encode_utf16().collect::<Vec<_>>(),
+                &mut i18n::t("blocking.passcode_label").encode_utf16().collect::<Vec<_>>(),
                 &mut passcode_label_rect,
                 DT_CENTER | DT_SINGLELINE,
             );
@@ -620,7 +630,7 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                 };
                 DrawTextW(
                     hdc,
-                    &mut "Incorrect passcode!".encode_utf16().collect::<Vec<_>>(),
+                    &mut i18n::t("blocking.incorrect").encode_utf16().collect::<Vec<_>>(),
                     &mut error_rect,
                     DT_CENTER | DT_SINGLELINE,
                 );
@@ -690,10 +700,12 @@ pub unsafe extern "system" fn blocking_overlay_proc(
                     }
                     ID_SHUTDOWN_BUTTON => {
                         // Show confirmation dialog
+                        let confirm_msg = i18n::wide("blocking.confirm_shutdown");
+                        let confirm_title = i18n::wide("blocking.confirm_title");
                         let result = MessageBoxW(
                             hwnd,
-                            w!("Are you sure you want to shut down the computer?"),
-                            w!("Confirm Shutdown"),
+                            PCWSTR(confirm_msg.as_ptr()),
+                            PCWSTR(confirm_title.as_ptr()),
                             MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2,
                         );
                         if result == IDYES {
@@ -823,11 +835,11 @@ pub unsafe extern "system" fn secondary_overlay_proc(
             FillRect(hdc, &rect, bg_brush);
             let _ = DeleteObject(bg_brush);
 
-            // Draw "Screen Locked" text in center (DPI scaled)
+            // Draw "Screen Locked" text in center (DPI scaled, ClearType quality = 5)
             let font = CreateFontW(
                 scale(48), 0, 0, 0,
                 FW_BOLD.0 as i32,
-                0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 5, 0,
                 w!("Segoe UI"),
             );
             let old_font = SelectObject(hdc, font);
@@ -836,7 +848,7 @@ pub unsafe extern "system" fn secondary_overlay_proc(
 
             DrawTextW(
                 hdc,
-                &mut "Screen Locked".encode_utf16().collect::<Vec<_>>(),
+                &mut i18n::t("blocking.screen_locked").encode_utf16().collect::<Vec<_>>(),
                 &mut rect,
                 DT_CENTER | DT_VCENTER | DT_SINGLELINE,
             );
@@ -906,10 +918,11 @@ pub unsafe fn create_secondary_overlays(hinstance: windows::Win32::Foundation::H
         let width = monitor.rect.right - monitor.rect.left;
         let height = monitor.rect.bottom - monitor.rect.top;
 
+        let locked_title = i18n::wide("blocking.screen_locked");
         let hwnd = CreateWindowExW(
             WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
             class_name,
-            w!("Screen Time - Locked"),
+            PCWSTR(locked_title.as_ptr()),
             WS_POPUP,
             monitor.rect.left,
             monitor.rect.top,

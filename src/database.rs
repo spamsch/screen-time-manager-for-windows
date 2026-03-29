@@ -15,11 +15,6 @@ pub const WEEKDAY_KEYS: [&str; 7] = [
     "limit_friday", "limit_saturday", "limit_sunday"
 ];
 
-/// Weekday names for UI
-pub const WEEKDAY_NAMES: [&str; 7] = [
-    "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
-];
-
 /// Get the path to the database file in a hidden location
 pub fn get_database_path() -> PathBuf {
     let data_dir = dirs::data_local_dir()

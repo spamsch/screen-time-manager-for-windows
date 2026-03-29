@@ -13,7 +13,7 @@ use windows::{
             DT_CENTER, DT_SINGLELINE, DT_VCENTER, FW_BOLD, PAINTSTRUCT, TRANSPARENT,
         },
         System::SystemInformation::GetTickCount,
-        UI::Input::GetLastInputInfo,
+        UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO},
         UI::WindowsAndMessaging::*,
     },
 };
@@ -316,8 +316,8 @@ fn force_resume() {
 /// Get the number of seconds since the last user input (mouse/keyboard)
 fn get_idle_seconds() -> u32 {
     unsafe {
-        let mut lii: windows::Win32::UI::Input::LASTINPUTINFO = zeroed();
-        lii.cbSize = std::mem::size_of::<windows::Win32::UI::Input::LASTINPUTINFO>() as u32;
+        let mut lii: LASTINPUTINFO = zeroed();
+        lii.cbSize = std::mem::size_of::<LASTINPUTINFO>() as u32;
         if GetLastInputInfo(&mut lii).as_bool() {
             let now = GetTickCount();
             now.wrapping_sub(lii.dwTime) / 1000
@@ -356,11 +356,6 @@ fn check_idle_state() {
 /// Check if timer is currently idle-paused
 pub fn is_idle_paused() -> bool {
     IS_IDLE_PAUSED.load(Ordering::SeqCst)
-}
-
-/// Check if timer is effectively paused (manual OR idle)
-pub fn is_effectively_paused() -> bool {
-    IS_PAUSED.load(Ordering::SeqCst) || IS_IDLE_PAUSED.load(Ordering::SeqCst)
 }
 
 /// Window procedure for the mini overlay
@@ -416,11 +411,11 @@ pub unsafe extern "system" fn mini_overlay_proc(
                 (time_str, color)
             };
 
-            // Draw time (scaled font)
+            // Draw time (scaled font, ClearType quality = 5)
             let hfont = CreateFontW(
                 scale(22), 0, 0, 0,
                 FW_BOLD.0 as i32,
-                0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 5, 0,
                 w!("Consolas"),
             );
 

@@ -10,6 +10,7 @@ mod constants;
 mod database;
 mod dialogs;
 mod dpi;
+mod i18n;
 mod mini_overlay;
 mod overlay;
 mod telegram;
