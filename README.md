@@ -127,6 +127,32 @@ Now it will start automatically every time the computer turns on.
 
 ---
 
+## Antivirus & Windows SmartScreen Warnings
+
+When you download or first run the app, Windows SmartScreen or your antivirus may warn that it's from an "unknown publisher" or flag it as suspicious. **This is a false positive.**
+
+Here's why it happens: this app does things that look identical to malware when a scanner only looks at *behavior* and not *intent*. It locks the screen, blocks keyboard and mouse input, can shut the computer down, and accepts remote commands over Telegram. That's exactly what a parental-control tool needs to do, and also exactly what a scanner's generic "this looks like a trojan" heuristic is tuned to catch. The app is also unsigned (a code-signing certificate costs money), which removes the one signal that would tell the scanner who built it.
+
+It contains no malware. Nothing is hidden, nothing phones home except the Telegram bot *you* configure with *your own* token.
+
+**If you don't want to take that on trust, don't. Build it yourself from source — then the exe you run is the code you can read.**
+
+### Build It Yourself
+
+1. Install [Rust](https://rustup.rs/) (the installer adds `cargo` to your PATH).
+2. Clone or download this repository.
+3. From the project folder, run:
+
+   ```
+   cargo build --release
+   ```
+
+4. The compiled app is at `target\release\screen-time-manager.exe`. Run it directly, or copy it next to the install scripts.
+
+The release binary on GitHub is built this exact way, from this exact source, on a clean GitHub Actions runner. Building locally just lets you verify that for yourself.
+
+---
+
 ## Requirements
 
 - Windows 10 or Windows 11
